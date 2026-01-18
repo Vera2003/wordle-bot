@@ -1,0 +1,53 @@
+version: '3.8'
+
+services:
+  test-db:
+    image: postgres:16-alpine
+    container_name: genetic-wordle-test-db
+    environment:
+      POSTGRES_DB: genetic_wordle_test
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: test_password
+    ports:
+      - "5433:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  test-redis:
+    image: redis:7-alpine
+    container_name: genetic-wordle-test-redis
+    command: redis-server --requirepass test_password
+    ports:
+      - "6380:6379"
+
+  test-runner:
+    build:
+      context: ..
+      dockerfile: ci-cd-files/Dockerfile
+      target: testing
+      args:
+        MODE: test
+    container_name: genetic-wordle-tests
+    environment:
+      ENVIRONMENT: testing
+      BOT_TOKEN: test_token
+      POSTGRES_HOST: test-db
+      POSTGRES_PORT: 5432
+      POSTGRES_DB: genetic_wordle_test
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: test_password
+      REDIS_HOST: test-redis
+      REDIS_PORT: 6379
+      REDIS_PASSWORD: test_password
+    depends_on:
+      test-db:
+        condition: service_healthy
+      test-redis:
+        condition: service_started
+    command: pytest -v --cov=src --cov-report=term-missing --cov-report=html
+    volumes:
+      - ../src:/app/src
+      - ../htmlcov:/app/htmlcov

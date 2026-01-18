@@ -1,0 +1,172 @@
+# version: '3'
+
+# env:
+#   COMPOSE_FILE: ci-cd-files/docker-compose.yml
+#   COMPOSE_TEST_FILE: ci-cd-files/docker-compose-test.yml
+
+# tasks:
+#   # === Разработка ===
+  
+#   install:
+#     desc: "Установить зависимости через Poetry"
+#     cmds:
+#       - poetry install --with dev
+
+#   dev:
+#     desc: "Запустить бота локально (без Docker)"
+#     cmds:
+#       - poetry run python -m src.app.bot.main
+
+#   api:
+#     desc: "Запустить API локально (без Docker)"
+#     cmds:
+#       - poetry run uvicorn src.app.main:app --reload --host 0.0.0.0 --port 8000
+
+#   # === Docker ===
+  
+#   build:
+#     desc: "Собрать Docker образы"
+#     cmds:
+#       - docker-compose -f $COMPOSE_FILE build
+
+#   up:
+#     desc: "Запустить все сервисы"
+#     cmds:
+#       - docker-compose -f $COMPOSE_FILE up -d
+
+#   down:
+#     desc: "Остановить все сервисы"
+#     cmds:
+#       - docker-compose -f $COMPOSE_FILE down
+
+#   restart:
+#     desc: "Перезапустить сервисы"
+#     cmds:
+#       - task: down
+#       - task: up
+
+#   logs:
+#     desc: "Показать логи (параметр: service=bot/api/postgres/redis)"
+#     cmds:
+#       - docker-compose -f $COMPOSE_FILE logs -f {{.service | default "bot"}}
+
+#   ps:
+#     desc: "Показать статус контейнеров"
+#     cmds:
+#       - docker-compose -f $COMPOSE_FILE ps
+
+#   # === База данных ===
+  
+#   db-init:
+#     desc: "Инициализировать БД (создать таблицы и добавить гены)"
+#     cmds:
+#       - poetry run python scripts/init_genes.py
+
+#   db-migrate:
+#     desc: "Создать новую миграцию (параметр: message='описание')"
+#     cmds:
+#       - poetry run alembic revision --autogenerate -m "{{.message}}"
+
+#   db-upgrade:
+#     desc: "Применить миграции"
+#     cmds:
+#       - poetry run alembic upgrade head
+
+#   db-downgrade:
+#     desc: "Откатить последнюю миграцию"
+#     cmds:
+#       - poetry run alembic downgrade -1
+
+#   db-shell:
+#     desc: "Подключиться к PostgreSQL через psql"
+#     cmds:
+#       - docker-compose -f $COMPOSE_FILE exec postgres psql -U postgres -d genetic_wordle
+
+#   # === Тестирование ===
+  
+#   test:
+#     desc: "Запустить тесты"
+#     cmds:
+#       - poetry run pytest -v
+
+#   test-cov:
+#     desc: "Запустить тесты с покрытием"
+#     cmds:
+#       - poetry run pytest -v --cov=src --cov-report=term-missing --cov-report=html
+
+#   test-docker:
+#     desc: "Запустить тесты в Docker"
+#     cmds:
+#       - docker-compose -f $COMPOSE_TEST_FILE up --abort-on-container-exit --exit-code-from test-runner
+#       - docker-compose -f $COMPOSE_TEST_FILE down
+
+#   # === Линтеры и форматирование ===
+  
+#   lint:
+#     desc: "Запустить все линтеры"
+#     cmds:
+#       - task: black-check
+#       - task: isort-check
+#       - task: flake8
+
+#   format:
+#     desc: "Отформатировать код"
+#     cmds:
+#       - poetry run black src
+#       - poetry run isort src
+
+#   black-check:
+#     desc: "Проверить форматирование Black"
+#     cmds:
+#       - poetry run black --check src
+
+#   isort-check:
+#     desc: "Проверить сортировку импортов"
+#     cmds:
+#       - poetry run isort --check-only src
+
+#   flake8:
+#     desc: "Запустить flake8"
+#     cmds:
+#       - poetry run flake8 src
+
+#   pre-commit:
+#     desc: "Установить pre-commit хуки"
+#     cmds:
+#       - poetry run pre-commit install
+
+#   pre-commit-run:
+#     desc: "Запустить pre-commit на всех файлах"
+#     cmds:
+#       - poetry run pre-commit run --all-files
+
+#   # === Утилиты ===
+  
+#   clean:
+#     desc: "Очистить временные файлы"
+#     cmds:
+#       - find . -type d -name "__pycache__" -exec rm -rf {} +
+#       - find . -type d -name "*.egg-info" -exec rm -rf {} +
+#       - find . -type d -name ".pytest_cache" -exec rm -rf {} +
+#       - find . -type d -name ".coverage" -exec rm -rf {} +
+#       - rm -rf htmlcov
+
+#   shell-bot:
+#     desc: "Войти в shell контейнера бота"
+#     cmds:
+#       - docker-compose -f $COMPOSE_FILE exec bot sh
+
+#   shell-api:
+#     desc: "Войти в shell контейнера API"
+#     cmds:
+#       - docker-compose -f $COMPOSE_FILE exec api sh
+
+#   backup-db:
+#     desc: "Создать бэкап базы данных"
+#     cmds:
+#       - docker-compose -f $COMPOSE_FILE exec postgres pg_dump -U postgres genetic_wordle > backup_$(date +%Y%m%d_%H%M%S).sql
+
+#   restore-db:
+#     desc: "Восстановить базу из бэкапа (параметр: file=backup.sql)"
+#     cmds:
+#       - docker-compose -f $COMPOSE_FILE exec -T postgres psql -U postgres genetic_wordle < {{.file}}
