@@ -1,6 +1,10 @@
 """
 Скрипт для инициализации БД генами из ТЗ
 """
+
+# Выполните init_genes.py внутри контейнера API
+# docker-compose -f ci-cd-files/docker-compose.yml exec api python scripts/init_genes.py
+
 import asyncio
 from sqlalchemy.ext.asyncio import create_async_engine, async_sessionmaker
 from sqlalchemy import select

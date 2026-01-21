@@ -1,5 +1,5 @@
 from datetime import datetime
-from sqlalchemy import BigInteger, Integer, Boolean, DateTime, ForeignKey, JSON, func
+from sqlalchemy import Column, Integer, BigInteger, String, DateTime, ForeignKey, Boolean, Text, func, JSON
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 from typing import List
 

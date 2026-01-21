@@ -57,10 +57,23 @@
 
 #   # === База данных ===
   
-#   db-init:
-#     desc: "Инициализировать БД (создать таблицы и добавить гены)"
-#     cmds:
-#       - poetry run python scripts/init_genes.py
+  # db-init:
+  #   desc: "Полная инициализация БД (гены + достижения + призы)"
+  #   cmds:
+  #     - poetry run python scripts/init_genes.py
+  
+  # db-seed:
+  #   desc: "Добавить тестовые данные"
+  #   cmds:
+  #     - poetry run python scripts/seed_test_data.py
+  
+  # db-reset:
+  #   desc: "Полный сброс БД и реинициализация"
+  #   cmds:
+  #     - task: down
+  #     - docker volume rm genetic-wordle-bot_postgres-data || true
+  #     - task: up
+  #     - task: db-init-full
 
 #   db-migrate:
 #     desc: "Создать новую миграцию (параметр: message='описание')"
@@ -170,3 +183,33 @@
 #     desc: "Восстановить базу из бэкапа (параметр: file=backup.sql)"
 #     cmds:
 #       - docker-compose -f $COMPOSE_FILE exec -T postgres psql -U postgres genetic_wordle < {{.file}}
+
+  # # Webhook режим (production)
+  # up-webhook:
+  #   desc: "Запустить в webhook режиме (нужен домен)"
+  #   cmds:
+  #     - docker-compose -f $COMPOSE_FILE up -d api postgres redis
+  #   env:
+  #     USE_WEBHOOK: "true"
+  
+  # # Polling режим (development)
+  # up-polling:
+  #   desc: "Запустить в polling режиме (разработка)"
+  #   cmds:
+  #     - docker-compose -f $COMPOSE_FILE --profile polling up -d
+  #   env:
+  #     USE_WEBHOOK: "false"
+  
+  # # По умолчанию - webhook если домен указан
+  # up:
+  #   desc: "Запустить (автоопределение режима)"
+  #   cmds:
+  #     - |
+  #       if [ -z "$WEBHOOK_DOMAIN" ] || [ "$USE_WEBHOOK" = "false" ]; then
+  #         echo "🔄 Запуск в POLLING режиме"
+  #         task up-polling
+  #       else
+  #         echo "🔗 Запуск в WEBHOOK режиме"
+  #         task up-webhook
+  #       fi
+

@@ -1,22 +1,103 @@
-from fastapi import FastAPI
+from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from contextlib import asynccontextmanager
 from prometheus_fastapi_instrumentator import Instrumentator
+from aiogram import Bot, Dispatcher
+from aiogram.client.default import DefaultBotProperties
+from aiogram.enums import ParseMode
+from aiogram.fsm.storage.redis import RedisStorage
+from sqlalchemy.ext.asyncio import create_async_engine, async_sessionmaker
+import redis.asyncio as aioredis
+import logging
 
 from .core.config import settings
 from .api.v1 import genes, stats, prizes
 from .db.session import engine
+from .bot.webhook import WebhookHandler, setup_webhook, remove_webhook
+from .bot.handlers import start, game, achievements, admin
+from .bot.middleware.db import DbSessionMiddleware
+
+logger = logging.getLogger(__name__)
+
+# Глобальные объекты для бота (только если webhook)
+bot: Bot | None = None
+dp: Dispatcher | None = None
+webhook_handler: WebhookHandler | None = None
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     """Lifecycle events"""
-    # Startup
-    print("🚀 FastAPI запущен")
+    global bot, dp, webhook_handler
+    
+    # === STARTUP ===
+    logger.info("🚀 FastAPI запускается...")
+    
+    # Если включен webhook режим, инициализируем бота
+    if settings.use_webhook:
+        logger.info("🔗 Webhook режим активирован")
+        
+        if not settings.webhook_domain:
+            raise ValueError("❌ WEBHOOK_DOMAIN не установлен в .env!")
+        
+        # Инициализация бота
+        bot = Bot(
+            token=settings.bot_token,
+            default=DefaultBotProperties(parse_mode=ParseMode.HTML)
+        )
+        
+        # Redis для FSM
+        redis_client = aioredis.from_url(
+            settings.redis_url,
+            encoding="utf-8",
+            decode_responses=True
+        )
+        storage = RedisStorage(redis_client)
+        
+        # Диспетчер
+        dp = Dispatcher(storage=storage)
+        
+        # Подключение к БД
+        engine_bot = create_async_engine(settings.database_url, echo=False)
+        sessionmaker = async_sessionmaker(engine_bot, expire_on_commit=False)
+        
+        # Middleware
+        dp.update.middleware(DbSessionMiddleware(sessionmaker, redis_client))
+        
+        # Регистрация роутеров
+        dp.include_router(start.router)
+        dp.include_router(game.router)
+        dp.include_router(achievements.router)
+        dp.include_router(admin.router)
+        
+        # Создаём webhook handler
+        webhook_handler = WebhookHandler(
+            bot=bot,
+            dp=dp,
+            secret_token=settings.webhook_secret
+        )
+        
+        # Настраиваем webhook в Telegram
+        await setup_webhook(
+            bot=bot,
+            webhook_url=settings.webhook_url,
+            secret_token=settings.webhook_secret
+        )
+        
+        logger.info(f"✅ Webhook настроен: {settings.webhook_url}")
+    else:
+        logger.info("📡 Webhook отключен (используйте polling)")
+    
     yield
-    # Shutdown
+    
+    # === SHUTDOWN ===
+    logger.info("👋 FastAPI останавливается...")
+    
+    if bot:
+        await remove_webhook(bot)
+        await bot.session.close()
+    
     await engine.dispose()
-    print("👋 FastAPI остановлен")
 
 
 app = FastAPI(
@@ -38,7 +119,16 @@ app.add_middleware(
 # Prometheus метрики
 Instrumentator().instrument(app).expose(app)
 
-# Подключение роутеров
+# Webhook endpoint (только если webhook включен)
+if settings.use_webhook:
+    @app.post(settings.webhook_path)
+    async def telegram_webhook(request: Request):
+        """Endpoint для приёма обновлений от Telegram"""
+        if webhook_handler:
+            return await webhook_handler.handle(request)
+        return {"status": "webhook not initialized"}
+
+# API роуты
 app.include_router(genes.router, prefix="/api/v1/genes", tags=["Genes"])
 app.include_router(stats.router, prefix="/api/v1/stats", tags=["Statistics"])
 app.include_router(prizes.router, prefix="/api/v1/prizes", tags=["Prizes"])
@@ -50,7 +140,9 @@ async def root():
     return {
         "status": "ok",
         "service": "genetic-wordle-api",
-        "version": "0.1.0"
+        "version": "0.1.0",
+        "webhook_enabled": settings.use_webhook,
+        "webhook_url": settings.webhook_url if settings.use_webhook else None
     }
 
 
