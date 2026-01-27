@@ -1,9 +1,14 @@
 from datetime import datetime
 from sqlalchemy import BigInteger, Integer, String, DateTime, func
 from sqlalchemy.orm import Mapped, mapped_column, relationship
-from typing import List
+from typing import TYPE_CHECKING, List
 
 from ..base import Base
+
+if TYPE_CHECKING:
+    from .game import GameSession
+    from .achievements import UserAchievement
+    from .prize import UserPrize
 
 
 class User(Base):
@@ -16,14 +21,10 @@ class User(Base):
     username: Mapped[str | None] = mapped_column(String(255), nullable=True)
     full_name: Mapped[str | None] = mapped_column(String(255), nullable=True)
     
-    # Энергия
     energy: Mapped[int] = mapped_column(Integer, default=5)
     last_energy_reset: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
-    
-    # Очки
     total_points: Mapped[int] = mapped_column(Integer, default=0)
     
-    # Временные метки
     created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
     updated_at: Mapped[datetime] = mapped_column(
         DateTime, 
@@ -31,22 +32,16 @@ class User(Base):
         onupdate=func.now()
     )
     
-    # Связи
+    # Связи - используем строковые ссылки
     game_sessions: Mapped[List["GameSession"]] = relationship(
-        "GameSession", 
         back_populates="user",
         cascade="all, delete-orphan"
     )
     achievements: Mapped[List["UserAchievement"]] = relationship(
-        "UserAchievement",
         back_populates="user",
         cascade="all, delete-orphan"
     )
     prizes: Mapped[List["UserPrize"]] = relationship(
-        "UserPrize",
         back_populates="user",
         cascade="all, delete-orphan"
     )
-    
-    def __repr__(self) -> str:
-        return f"<User(id={self.id}, telegram_id={self.telegram_id}, username={self.username})>"
