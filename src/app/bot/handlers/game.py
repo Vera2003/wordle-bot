@@ -1,8 +1,9 @@
 from aiogram import Router, F
 from aiogram.types import Message, CallbackQuery
 from aiogram.fsm.context import FSMContext
+from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
-import re
+# import re
 
 from ..keyboards.menu import get_main_menu_keyboard
 from ..keyboards.game import get_game_keyboard, get_game_finished_keyboard
@@ -38,7 +39,9 @@ async def start_game(
         message = event
     
     # Получаем пользователя
-    user = await db.get(User, user_id)
+    stmt = select(User).where(User.telegram_id == user_id)
+    result = await db.execute(stmt)
+    user = result.scalar_one_or_none()
     if not user:
         await message.answer("❌ Используйте /start для регистрации")
         return
@@ -136,8 +139,10 @@ async def process_guess(
         return
     
     # Получаем user_id
-    user = await db.get(User, message.from_user.id)
-    
+    stmt = select(User).where(User.telegram_id == message.from_user.id)
+    result = await db.execute(stmt)
+    user = result.scalar_one_or_none()
+        
     # Сервисы
     game_service = GameService(db)
     energy_service = EnergyService(db, redis)
@@ -241,7 +246,9 @@ async def use_hint(callback: CallbackQuery, state: FSMContext, db: AsyncSession,
         return
     
     # Получаем пользователя и сессию
-    user = await db.get(User, callback.from_user.id)
+    stmt = select(User).where(User.telegram_id == callback.from_user.id)
+    result = await db.execute(stmt)
+    user = result.scalar_one_or_none()
     session = await db.get(GameSession, session_id)
     await db.refresh(session, ['gene'])
     
@@ -295,7 +302,9 @@ async def surrender_game(callback: CallbackQuery, state: FSMContext, db: AsyncSe
     await db.commit()
     await db.refresh(session, ['gene'])
     
-    user = await db.get(User, callback.from_user.id)
+    stmt = select(User).where(User.telegram_id == callback.from_user.id)
+    result = await db.execute(stmt)
+    user = result.scalar_one_or_none()
     
     await callback.message.edit_text(
         LOSE_MESSAGE.format(

@@ -1,5 +1,6 @@
 from aiogram import Router, F
 from aiogram.types import Message, CallbackQuery
+from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from ..keyboards.menu import get_main_menu_keyboard
@@ -28,7 +29,9 @@ async def show_stats(
         message = event
     
     # Получаем пользователя
-    user = await db.get(User, user_id)
+    stmt = select(User).where(User.telegram_id == user_id)
+    result = await db.execute(stmt)
+    user = result.scalar_one_or_none()
     if not user:
         await message.answer("❌ Используйте /start")
         return
