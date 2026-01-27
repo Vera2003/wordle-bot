@@ -17,6 +17,13 @@ from .bot.webhook import WebhookHandler, setup_webhook, remove_webhook
 from .bot.handlers import start, game, achievements, admin
 from .bot.middleware.db import DbSessionMiddleware
 
+# ⚡ ВАЖНО: Импортируем все модели до использования
+from .db.models.user import User
+from .db.models.gene import Gene
+from .db.models.game import GameSession, GameAttempt
+from .db.models.achievements import AchievementType, UserAchievement
+from .db.models.prize import PrizeType, UserPrize
+
 logger = logging.getLogger(__name__)
 
 # Глобальные объекты для бота (только если webhook)
