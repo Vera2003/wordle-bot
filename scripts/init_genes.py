@@ -21,7 +21,7 @@ from src.app.db.base import Base
 from src.app.db.models.gene import Gene
 from src.app.db.models.user import User
 from src.app.db.models.game import GameSession, GameAttempt
-from src.app.db.models.achievement import AchievementType, UserAchievement
+from src.app.db.models.achievements import AchievementType, UserAchievement
 from src.app.db.models.prize import PrizeType, UserPrize
 
 

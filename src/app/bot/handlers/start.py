@@ -3,6 +3,7 @@ from aiogram.filters import CommandStart, Command
 from aiogram.types import Message, CallbackQuery
 from aiogram.fsm.context import FSMContext
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy import select
 
 from ..keyboards.menu import get_main_menu_keyboard
 from ..texts.messages import WELCOME_MESSAGE, MAIN_MENU_MESSAGE, RULES_MESSAGE
@@ -17,8 +18,10 @@ router = Router()
 @router.message(CommandStart())
 async def cmd_start(message: Message, state: FSMContext, db: AsyncSession):
     """Обработчик команды /start"""
-    # Создаём или получаем пользователя
-    user = await db.get(User, message.from_user.id)
+    # Ищем пользователя по telegram_id
+    stmt = select(User).where(User.telegram_id == message.from_user.id)
+    result = await db.execute(stmt)
+    user = result.scalar_one_or_none()
     
     if not user:
         user = User(
@@ -78,8 +81,11 @@ async def show_energy(
     
     energy_service = EnergyService(db, redis)
     
-    # Получаем пользователя
-    user = await db.get(User, message.from_user.id)
+    # Ищем пользователя по telegram_id
+    stmt = select(User).where(User.telegram_id == message.from_user.id)
+    result = await db.execute(stmt)
+    user = result.scalar_one_or_none()
+    
     if not user:
         await message.answer("❌ Пользователь не найден. Используйте /start")
         return
