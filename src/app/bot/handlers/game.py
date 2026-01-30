@@ -3,7 +3,7 @@ from aiogram.types import Message, CallbackQuery
 from aiogram.fsm.context import FSMContext
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
-# import re
+import re
 
 from ..keyboards.menu import get_main_menu_keyboard
 from ..keyboards.game import get_game_keyboard, get_game_finished_keyboard
