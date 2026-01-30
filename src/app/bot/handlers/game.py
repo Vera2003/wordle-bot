@@ -14,6 +14,7 @@ from ..texts.messages import (
 )
 from ..states.game import GameStates
 from ...db.models.user import User
+from ...db.models.game import GameSession
 from ...services.game_service import GameService
 from ...services.energy_service import EnergyService
 from ...core.config import settings
@@ -114,7 +115,20 @@ async def start_game(
         )
 
 
-@router.message(GameStates.waiting_for_guess, F.text)
+# ИСПРАВЛЕНИЕ: Исключаем кнопки меню из обработки игровых попыток
+@router.message(
+    GameStates.waiting_for_guess,
+    F.text,
+    ~F.text.in_([
+        "🏠 Главное меню",
+        "📊 Статистика", 
+        "🏆 Мои достижения",
+        "📋 Правила игры",
+        "💡 Подсказка дня",
+        "⚡ Энергия",
+        "🎮 Играть"
+    ])
+)
 async def process_guess(
     message: Message,
     state: FSMContext,
@@ -288,6 +302,8 @@ async def use_hint(callback: CallbackQuery, state: FSMContext, db: AsyncSession,
 @router.callback_query(F.data == "game:surrender")
 async def surrender_game(callback: CallbackQuery, state: FSMContext, db: AsyncSession):
     """Сдаться в игре"""
+    from datetime import datetime
+    
     data = await state.get_data()
     session_id = data.get('session_id')
     

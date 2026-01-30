@@ -70,6 +70,33 @@ async def show_rules(message: Message):
     )
 
 
+@router.message(F.text == "💡 Подсказка дня")
+async def show_daily_hint(message: Message, db: AsyncSession):
+    """Показывает подсказку дня"""
+    import random
+    from ...db.models.gene import Gene
+    
+    # Получаем случайный ген для подсказки
+    query = select(Gene).where(Gene.is_active == True)
+    result = await db.execute(query)
+    genes = result.scalars().all()
+    
+    if genes:
+        gene = random.choice(genes)
+        await message.answer(
+            f"💡 <b>Подсказка дня</b>\n\n"
+            f"<b>Ген:</b> {len(gene.name)} букв(ы)\n"
+            f"<b>Что он делает:</b>\n{gene.hint}\n\n"
+            f"💪 Используйте эту информацию в игре!",
+            reply_markup=get_main_menu_keyboard()
+        )
+    else:
+        await message.answer(
+            "💡 Подсказки пока недоступны",
+            reply_markup=get_main_menu_keyboard()
+        )
+
+
 @router.message(F.text == "⚡ Энергия")
 async def show_energy(
     message: Message, 
