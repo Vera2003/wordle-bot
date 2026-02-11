@@ -1,77 +1,185 @@
-import asyncio
-import logging
+from fastapi import FastAPI, Request
+from fastapi.middleware.cors import CORSMiddleware
+from contextlib import asynccontextmanager
+from prometheus_fastapi_instrumentator import Instrumentator
 from aiogram import Bot, Dispatcher
 from aiogram.client.default import DefaultBotProperties
 from aiogram.enums import ParseMode
 from aiogram.fsm.storage.redis import RedisStorage
 from sqlalchemy.ext.asyncio import create_async_engine, async_sessionmaker
 import redis.asyncio as aioredis
+import structlog  # ← ИЗМЕНИЛИ
 
-from ..core.config import settings
-from .handlers import start, game, achievements, admin
-from .middleware.db import DbSessionMiddleware
+from .core.config import settings
+from .core.logging_config import setup_logging  # ← ДОБАВИЛИ
+from .api.v1 import genes, stats, prizes
+from .db.session import engine
+from .bot.webhook import WebhookHandler, setup_webhook, remove_webhook
+from .bot.handlers import start, game, achievements, admin
+from .bot.middleware.db import DbSessionMiddleware
+from .bot.middleware.logging import LoggingMiddleware
 
-# Настройка логирования
-logging.basicConfig(
-    level=logging.INFO,
-    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
-)
-logger = logging.getLogger(__name__)
+# ⚡ ВАЖНО: Импортируем все модели до использования
+from .db.models.user import User
+from .db.models.gene import Gene
+from .db.models.game import GameSession, GameAttempt
+from .db.models.achievements import AchievementType, UserAchievement
+from .db.models.prize import PrizeType, UserPrize
+
+# Инициализация structlog ДО создания logger
+setup_logging()  # ← ДОБАВИЛИ
+
+logger = structlog.get_logger(__name__)  # ← ИЗМЕНИЛИ
+
+# Глобальные объекты для бота (только если webhook)
+bot: Bot | None = None
+dp: Dispatcher | None = None
+webhook_handler: WebhookHandler | None = None
 
 
-async def main():
-    """Главная функция запуска бота"""
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    """Lifecycle events"""
+    global bot, dp, webhook_handler
     
-    logger.info(f"🤖 Запуск бота в режиме: {'WEBHOOK' if settings.use_webhook else 'POLLING'}")
+    # === STARTUP ===
+    logger.info("🚀 FastAPI starting up")
     
-    # Инициализация бота
-    bot = Bot(
-        token=settings.bot_token,
-        default=DefaultBotProperties(parse_mode=ParseMode.HTML)
-    )
+    # Если включен webhook режим, инициализируем бота
+    if settings.use_webhook:
+        logger.info("🔗 Webhook mode activated")
+        
+        if not settings.webhook_domain:
+            raise ValueError("❌ WEBHOOK_DOMAIN не установлен в .env!")
+        
+        # Инициализация бота
+        bot = Bot(
+            token=settings.bot_token,
+            default=DefaultBotProperties(parse_mode=ParseMode.HTML)
+        )
+        
+        # Redis для FSM
+        redis_client = aioredis.from_url(
+            settings.redis_url,
+            encoding="utf-8",
+            decode_responses=True
+        )
+        storage = RedisStorage(redis_client)
+        
+        # Диспетчер
+        dp = Dispatcher(storage=storage)
+        
+        # Подключение к БД
+        engine_bot = create_async_engine(settings.database_url, echo=False)
+        sessionmaker = async_sessionmaker(engine_bot, expire_on_commit=False)
+        
+        # ========== MIDDLEWARE (ПОРЯДОК ВАЖЕН!) ==========
+        # 1. Сначала LoggingMiddleware (чтобы логировать ВСЕ события)
+        dp.update.middleware(LoggingMiddleware())
+        
+        # 2. Затем DbSessionMiddleware (для доступа к БД и Redis)
+        dp.update.middleware(DbSessionMiddleware(sessionmaker, redis_client))
+        # ==================================================
+        
+        # Регистрация роутеров
+        dp.include_router(start.router)
+        dp.include_router(game.router)
+        dp.include_router(achievements.router)
+        dp.include_router(admin.router)
+        
+        # Создаём webhook handler
+        webhook_handler = WebhookHandler(
+            bot=bot,
+            dp=dp,
+            secret_token=settings.webhook_secret
+        )
+        
+        # Настраиваем webhook в Telegram
+        await setup_webhook(
+            bot=bot,
+            webhook_url=settings.webhook_url,
+            secret_token=settings.webhook_secret
+        )
+        
+        logger.info("✅ Webhook configured", webhook_url=settings.webhook_url)
+        logger.info("📊 LoggingMiddleware activated")
+    else:
+        logger.info("📡 Webhook disabled (use polling)")
     
-    # Redis для FSM storage
-    redis_client = aioredis.from_url(
-        settings.redis_url,
-        encoding="utf-8",
-        decode_responses=True
-    )
-    storage = RedisStorage(redis_client)
+    yield
     
-    # Диспетчер
-    dp = Dispatcher(storage=storage)
+    # === SHUTDOWN ===
+    logger.info("👋 FastAPI shutting down")
     
-    # Подключение к БД
-    engine = create_async_engine(settings.database_url, echo=False)
-    sessionmaker = async_sessionmaker(engine, expire_on_commit=False)
-    
-    # Middleware
-    dp.update.middleware(DbSessionMiddleware(sessionmaker, redis_client))
-    
-    # Регистрация роутеров
-    dp.include_router(start.router)
-    dp.include_router(game.router)
-    dp.include_router(achievements.router)
-    dp.include_router(admin.router)
-    
-    try:
-        if settings.use_webhook:
-            # Webhook режим - НЕ запускаем здесь, он запускается через FastAPI
-            logger.warning("⚠️ Webhook режим включен, но bot/main.py запущен напрямую!")
-            logger.warning("⚠️ Для webhook используйте: uvicorn src.app.main:app")
-            logger.info("💡 Переключаюсь на polling для тестирования...")
-            await bot.delete_webhook(drop_pending_updates=True)
-            await dp.start_polling(bot)
-        else:
-            # Polling режим
-            logger.info("📡 Polling режим активирован")
-            await bot.delete_webhook(drop_pending_updates=True)
-            await dp.start_polling(bot)
-    finally:
+    if bot:
+        await remove_webhook(bot)
         await bot.session.close()
-        await engine.dispose()
-        await redis_client.close()
+    
+    await engine.dispose()
 
 
-if __name__ == '__main__':
-    asyncio.run(main())
+app = FastAPI(
+    title="Genetic Wordle Admin API",
+    description="API для администрирования игры Genetic Wordle",
+    version="0.1.0",
+    lifespan=lifespan
+)
+
+# CORS
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
+# Prometheus метрики
+Instrumentator().instrument(app).expose(app)
+
+# Webhook endpoint (только если webhook включен)
+if settings.use_webhook:
+    @app.post(settings.webhook_path)
+    async def telegram_webhook(request: Request):
+        """Endpoint для приёма обновлений от Telegram"""
+        if webhook_handler:
+            return await webhook_handler.handle(request)
+        return {"status": "webhook not initialized"}
+
+# API роуты
+app.include_router(genes.router, prefix="/api/v1/genes", tags=["Genes"])
+app.include_router(stats.router, prefix="/api/v1/stats", tags=["Statistics"])
+app.include_router(prizes.router, prefix="/api/v1/prizes", tags=["Prizes"])
+
+
+@app.get("/")
+async def root():
+    """Health check"""
+    return {
+        "status": "ok",
+        "service": "genetic-wordle-api",
+        "version": "0.1.0",
+        "webhook_enabled": settings.use_webhook,
+        "webhook_url": settings.webhook_url if settings.use_webhook else None
+    }
+
+
+@app.get("/health")
+async def health():
+    """Health check endpoint"""
+    return {"status": "healthy"}
+
+
+@app.get("/webhook/status")
+async def webhook_status():
+    """Проверка статуса webhook"""
+    if bot:
+        webhook_info = await bot.get_webhook_info()
+        return {
+            "url": webhook_info.url,
+            "has_custom_certificate": webhook_info.has_custom_certificate,
+            "pending_update_count": webhook_info.pending_update_count,
+            "last_error_date": webhook_info.last_error_date,
+            "last_error_message": webhook_info.last_error_message,
+        }
+    return {"error": "Bot not initialized"}

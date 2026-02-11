@@ -8,7 +8,7 @@ from aiogram.enums import ParseMode
 from aiogram.fsm.storage.redis import RedisStorage
 from sqlalchemy.ext.asyncio import create_async_engine, async_sessionmaker
 import redis.asyncio as aioredis
-import logging
+import structlog
 
 from .core.config import settings
 from .api.v1 import genes, stats, prizes
@@ -16,6 +16,7 @@ from .db.session import engine
 from .bot.webhook import WebhookHandler, setup_webhook, remove_webhook
 from .bot.handlers import start, game, achievements, admin
 from .bot.middleware.db import DbSessionMiddleware
+from .bot.middleware.logging import LoggingMiddleware  # ← ДОБАВИЛИ
 
 # ⚡ ВАЖНО: Импортируем все модели до использования
 from .db.models.user import User
@@ -24,7 +25,7 @@ from .db.models.game import GameSession, GameAttempt
 from .db.models.achievements import AchievementType, UserAchievement
 from .db.models.prize import PrizeType, UserPrize
 
-logger = logging.getLogger(__name__)
+logger = structlog.getLogger(__name__)
 
 # Глобальные объекты для бота (только если webhook)
 bot: Bot | None = None
@@ -68,15 +69,24 @@ async def lifespan(app: FastAPI):
         engine_bot = create_async_engine(settings.database_url, echo=False)
         sessionmaker = async_sessionmaker(engine_bot, expire_on_commit=False)
         
-        # Middleware
+        # ========== MIDDLEWARE (ПОРЯДОК ВАЖЕН!) ==========
+        # 1. Сначала LoggingMiddleware (чтобы логировать ВСЕ события)
+        dp.update.middleware(LoggingMiddleware())
+        logger.info("🔍 DEBUG: LoggingMiddleware registered")
+
+        # 2. Затем DbSessionMiddleware (для доступа к БД и Redis)
         dp.update.middleware(DbSessionMiddleware(sessionmaker, redis_client))
+        logger.info("🔍 DEBUG: DbSessionMiddleware registered")
+
+        # ==================================================
         
         # Регистрация роутеров
         dp.include_router(start.router)
         dp.include_router(game.router)
         dp.include_router(achievements.router)
         dp.include_router(admin.router)
-        
+        logger.info("🔍 DEBUG: All routers registered")
+
         # Создаём webhook handler
         webhook_handler = WebhookHandler(
             bot=bot,
@@ -92,6 +102,7 @@ async def lifespan(app: FastAPI):
         )
         
         logger.info(f"✅ Webhook настроен: {settings.webhook_url}")
+        logger.info("📊 LoggingMiddleware активирован")  # ← ДОБАВИЛИ
     else:
         logger.info("📡 Webhook отключен (используйте polling)")
     

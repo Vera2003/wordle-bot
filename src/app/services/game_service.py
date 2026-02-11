@@ -1,14 +1,17 @@
 from typing import List, Dict, Optional
 from datetime import datetime, timedelta
 import random
+
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, func
+from sqlalchemy.orm import selectinload
 
 from ..db.models.user import User
 from ..db.models.gene import Gene
 from ..db.models.game import GameSession, GameAttempt
 from ..schemas.game import LetterStatus, AttemptResult
 
+import structlog
 
 class GameService:
     """Сервис игровой логики Wordle"""
@@ -140,10 +143,12 @@ class GameService:
         # Проверяем попытку
         target_word = session.gene.name
         guess = guess.upper()
-        
+
+        logger.info(f"DEBUG: Game session ID={session.id}, gene.name='{session.gene.name}', expected_len={len(session.gene.name)}, guess_len={len(guess)}")
+
         # Валидация
         if len(guess) != len(target_word):
-            raise ValueError(f"Слово должно быть {len(target_word)} букв")
+            raise ValueError(f"Слово должно быть из {len(target_word)} букв(ы)")
         
         # Проверяем угадывание
         check_result = self.check_guess(target_word, guess)

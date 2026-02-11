@@ -1,48 +1,51 @@
 """
 Webhook обработчик для Telegram бота
 """
+import structlog
 from aiogram import Bot, Dispatcher
 from aiogram.types import Update
-from fastapi import Request, Response
-import logging
-import json
+from fastapi import Request
+import hmac
+import hashlib
 
-logger = logging.getLogger(__name__)
+logger = structlog.get_logger(__name__)
 
 
 class WebhookHandler:
-    """Обработчик webhook запросов для FastAPI"""
-    
-    def __init__(self, bot: Bot, dp: Dispatcher, secret_token: str = ""):
+    def __init__(self, bot: Bot, dp: Dispatcher, secret_token: str):
         self.bot = bot
         self.dp = dp
         self.secret_token = secret_token
-    
-    async def handle(self, request: Request) -> Response:
-        """Обработка входящего webhook запроса от Telegram"""
-        
-        # Проверка secret token
-        if self.secret_token:
+
+    async def handle(self, request: Request):
+        """Обработка входящих webhook запросов"""
+        try:
+            # Логируем входящий запрос
+            logger.info("🌐 Incoming webhook request")
+            
+            # Проверка токена
             token = request.headers.get("X-Telegram-Bot-Api-Secret-Token")
             if token != self.secret_token:
-                logger.warning(f"Invalid secret token received")
-                return Response(status_code=403, content="Forbidden")
-        
-        try:
-            # Получаем JSON от Telegram
-            body = await request.json()
+                logger.warning("❌ Invalid secret token", received_token=token)
+                return {"status": "error", "message": "Invalid token"}
+
+            # Получаем данные
+            data = await request.json()
+            logger.info("📦 Webhook data received", update_id=data.get("update_id"))
             
             # Создаём Update объект
-            update = Update(**body)
+            update = Update(**data)
             
             # Передаём в диспетчер
+            logger.info("🔄 Feeding update to dispatcher", update_id=update.update_id)
             await self.dp.feed_update(bot=self.bot, update=update)
             
-            return Response(status_code=200, content="OK")
+            logger.info("✅ Update processed successfully", update_id=update.update_id)
+            return {"status": "ok"}
             
         except Exception as e:
-            logger.error(f"Error processing webhook: {e}", exc_info=True)
-            return Response(status_code=500, content="Internal Server Error")
+            logger.error("❌ Error processing webhook", error=str(e), exc_info=True)
+            return {"status": "error", "message": str(e)}
 
 
 async def setup_webhook(bot: Bot, webhook_url: str, secret_token: str = ""):

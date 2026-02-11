@@ -22,97 +22,130 @@ from ...core.config import settings
 router = Router()
 
 
-@router.message(F.text == "🎮 Играть")
-@router.callback_query(F.data == "game:play_again")
-async def start_game(
-    event: Message | CallbackQuery,
-    state: FSMContext,
-    db: AsyncSession,
-    redis
-):
-    """Начинает новую игру"""
-    # Получаем user_id
-    if isinstance(event, CallbackQuery):
-        user_id = event.from_user.id
-        message = event.message
-    else:
-        user_id = event.from_user.id
-        message = event
+@router.message(F.text == "🎮 Начать игру")
+async def start_game(message: Message, state: FSMContext, db: AsyncSession, redis):
+    from datetime import datetime
+    from ...db.models.game import GameSession
+    from ...db.models.gene import Gene
+    import random
     
     # Получаем пользователя
-    stmt = select(User).where(User.telegram_id == user_id)
+    stmt = select(User).where(User.telegram_id == message.from_user.id)
     result = await db.execute(stmt)
     user = result.scalar_one_or_none()
+    
     if not user:
-        await message.answer("❌ Используйте /start для регистрации")
+        await message.answer("❌ Используйте /start")
         return
     
-    # Проверяем энергию
-    energy_service = EnergyService(db, redis)
-    current_energy = await energy_service.get_user_energy(user.id)
+    # НОВОЕ: Проверяем и завершаем старые игры
+    today = datetime.utcnow().date()
     
-    if current_energy < settings.energy_per_attempt:
-        await message.answer(
-            NO_ENERGY_MESSAGE.format(
-                current_energy=current_energy,
-                required_energy=settings.energy_per_attempt
-            ),
-            reply_markup=get_main_menu_keyboard()
-        )
-        if isinstance(event, CallbackQuery):
-            await event.answer()
-        return
-    
-    # Проверяем активную игру
-    game_service = GameService(db)
-    active_game = await game_service.get_active_game(user.id)
-    
-    if active_game:
-        await message.answer(
-            ERROR_ALREADY_IN_GAME,
-            reply_markup=get_main_menu_keyboard()
-        )
-        if isinstance(event, CallbackQuery):
-            await event.answer()
-        return
-    
-    # Создаём новую игру
-    session = await game_service.start_game(user.id)
-    await db.refresh(session, ['gene'])
-    
-    # Тратим энергию на первую попытку
-    await energy_service.spend_energy(user.id, settings.energy_per_attempt)
-    current_energy -= settings.energy_per_attempt
-    
-    # Сохраняем session_id в FSM
-    await state.update_data(session_id=session.id)
-    await state.set_state(GameStates.waiting_for_guess)
-    
-    can_use_hint = current_energy >= settings.energy_per_hint
-    
-    text = GAME_START_MESSAGE.format(
-        length=session.gene.length,
-        attempts=session.max_attempts,
-        energy=current_energy
+    # Находим все незавершенные игры
+    old_games_query = select(GameSession).where(
+        GameSession.user_id == user.id,
+        GameSession.is_finished == False
     )
+    result = await db.execute(old_games_query)
+    old_games = result.scalars().all()
     
-    if isinstance(event, CallbackQuery):
-        await event.message.edit_text(
-            text,
-            reply_markup=get_game_keyboard(
-                has_energy=current_energy > 0,
-                can_use_hint=can_use_hint
-            )
-        )
-        await event.answer()
+    # Завершаем игры, которые не сегодняшние
+    for game in old_games:
+        if game.created_at.date() != today:
+            game.is_finished = True
+            game.finished_at = datetime.utcnow()
+    
+    if old_games:
+        await db.commit()
+    
+    # Получаем ген дня из Redis
+    today_str = today.strftime("%Y-%m-%d")
+    gene_of_day_key = f"gene_of_day:{today_str}"
+    gene_id = await redis.get(gene_of_day_key)
+    
+    if gene_id:
+        gene = await db.get(Gene, int(gene_id))
     else:
-        await message.answer(
-            text,
-            reply_markup=get_game_keyboard(
-                has_energy=current_energy > 0,
-                can_use_hint=can_use_hint
-            )
+        # Если нет гена дня, выбираем случайный
+        query = select(Gene).where(Gene.is_active == True)
+        result = await db.execute(query)
+        genes = result.scalars().all()
+        
+        if not genes:
+            await message.answer("❌ Нет доступных генов для игры")
+            return
+        
+        gene = random.choice(genes)
+        
+        # Сохраняем в Redis до конца дня
+        now = datetime.utcnow()
+        midnight = datetime.combine(now.date(), datetime.min.time()) + timedelta(days=1)
+        ttl = int((midnight - now).total_seconds())
+        await redis.set(gene_of_day_key, gene.id, ex=ttl)
+    
+    # Проверяем, есть ли уже активная игра на сегодня с этим геном
+    active_game_query = select(GameSession).where(
+        GameSession.user_id == user.id,
+        GameSession.gene_id == gene.id,
+        GameSession.is_finished == False
+    )
+    result = await db.execute(active_game_query)
+    existing_game = result.scalar_one_or_none()
+    
+    if existing_game:
+        # Продолжаем существующую игру
+        await state.set_state(GameStates.playing)
+        await state.update_data(
+            game_id=existing_game.id,
+            target_word=gene.name.upper(),
+            attempts=existing_game.attempts_count
         )
+        
+        await message.answer(
+            f"🎮 Продолжаем игру!\n\n"
+            f"Слово из {len(gene.name)} букв\n"
+            f"Попыток использовано: {existing_game.attempts_count}/6\n\n"
+            f"Введите ваше слово:",
+            reply_markup=get_game_keyboard()
+        )
+    else:
+        # Создаём новую игру
+        session = await game_service.start_game(user.id)
+        await db.refresh(session, ['gene'])
+        
+        # Тратим энергию на первую попытку
+        await energy_service.spend_energy(user.id, settings.energy_per_attempt)
+        current_energy -= settings.energy_per_attempt
+        
+        # Сохраняем session_id в FSM
+        await state.update_data(session_id=session.id)
+        await state.set_state(GameStates.waiting_for_guess)
+        
+        can_use_hint = current_energy >= settings.energy_per_hint
+        
+        text = GAME_START_MESSAGE.format(
+            length=session.gene.length,
+            attempts=session.max_attempts,
+            energy=current_energy
+        )
+    
+        if isinstance(event, CallbackQuery):
+            await event.message.edit_text(
+                text,
+                reply_markup=get_game_keyboard(
+                    has_energy=current_energy > 0,
+                    can_use_hint=can_use_hint
+                )
+            )
+            await event.answer()
+        else:
+            await message.answer(
+                text,
+                reply_markup=get_game_keyboard(
+                    has_energy=current_energy > 0,
+                    can_use_hint=can_use_hint
+                )
+            )
 
 
 # ИСПРАВЛЕНИЕ: Исключаем кнопки меню из обработки игровых попыток
