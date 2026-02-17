@@ -1,25 +1,26 @@
 from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton, ReplyKeyboardMarkup, KeyboardButton
 
+from ..keyboards.menu import get_game_keyboard
 
-def get_game_keyboard(can_use_hint: bool = True) -> InlineKeyboardMarkup:
-    """Клавиатура для игрового процесса"""
-    buttons = [
-        [
-            InlineKeyboardButton(text="🔤 Ввести слово", callback_data="enter_word"),
-        ],
-    ]
+# def get_game_keyboard(can_use_hint: bool = True) -> InlineKeyboardMarkup:
+#     """Клавиатура для игрового процесса"""
+#     buttons = [
+#         [
+#             InlineKeyboardButton(text="🔤 Ввести слово", callback_data="enter_word"),
+#         ],
+#     ]
     
-    if can_use_hint:
-        buttons.append([
-            InlineKeyboardButton(text="💡 Подсказка", callback_data="get_hint"),
-        ])
+#     if can_use_hint:
+#         buttons.append([
+#             InlineKeyboardButton(text="💡 Подсказка", callback_data="get_hint"),
+#         ])
     
-    buttons.append([
-        InlineKeyboardButton(text="❌ Сдаться", callback_data="give_up"),
-    ])
+#     buttons.append([
+#         InlineKeyboardButton(text="❌ Сдаться", callback_data="give_up"),
+#     ])
     
-    keyboard = InlineKeyboardMarkup(inline_keyboard=buttons)
-    return keyboard
+#     keyboard = InlineKeyboardMarkup(inline_keyboard=buttons)
+#     return keyboard
 
 
 def get_game_finished_keyboard(won: bool = False) -> InlineKeyboardMarkup:

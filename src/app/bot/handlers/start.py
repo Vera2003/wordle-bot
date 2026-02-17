@@ -4,11 +4,15 @@ from aiogram.types import Message, CallbackQuery
 from aiogram.fsm.context import FSMContext
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
+from sqlalchemy import delete
 
 from ..keyboards.menu import get_main_menu_keyboard
 from ..texts.messages import WELCOME_MESSAGE, MAIN_MENU_MESSAGE, RULES_MESSAGE
 from ..states.game import GameStates
 from ...db.models.user import User
+from ...db.models.game import GameSession
+from ...db.models.achievements import UserAchievement
+from ...db.models.prize import UserPrize
 from ...services.energy_service import EnergyService
 from ...core.config import settings
 
@@ -22,50 +26,51 @@ router = Router()
 
 @router.message(Command("resetday"))
 async def cmd_reset_day(message: Message, db: AsyncSession, redis):
-    """Сбросить слово дня (для тестирования)"""
-    from datetime import datetime
-    from ...db.models.game import GameSession
-    
-    # ПРОВЕРКА: только для вашего Telegram ID
-    ADMIN_IDS = [1085711478]  # Замените на ваш Telegram ID
-    
+    ADMIN_IDS = [1085711478]  # или settings.admin_ids
     if message.from_user.id not in ADMIN_IDS:
         await message.answer("❌ У вас нет доступа к этой команде")
         return
-    
-    # Получаем пользователя
+
     stmt = select(User).where(User.telegram_id == message.from_user.id)
     result = await db.execute(stmt)
     user = result.scalar_one_or_none()
-    
+
     if not user:
         await message.answer("❌ Используйте /start")
         return
-    
+
     today = datetime.utcnow().strftime("%Y-%m-%d")
     gene_of_day_key = f"gene_of_day:{today}"
     user_hints_key = f"user:{user.id}:daily_hints:{today}"
-    
-    # Удаляем ген дня из Redis
+
     await redis.delete(gene_of_day_key)
-    
-    # Сбрасываем счетчик подсказок
     await redis.delete(user_hints_key)
-    
-    # Завершаем все активные игры пользователя
+
+    # закрываем и удаляем игровые данные
     active_games_query = select(GameSession).where(
         GameSession.user_id == user.id,
         GameSession.is_finished == False
     )
     result = await db.execute(active_games_query)
     active_games = result.scalars().all()
-    
+
     for game in active_games:
         game.is_finished = True
         game.finished_at = datetime.utcnow()
-    
-    if active_games:
-        await db.commit()
+
+    await db.execute(delete(GameSession).where(GameSession.user_id == user.id))
+    await db.execute(delete(UserAchievement).where(UserAchievement.user_id == user.id))
+    await db.execute(delete(UserPrize).where(UserPrize.user_id == user.id))
+
+    user.total_points = 0
+    await db.commit()
+
+    # восстановление дневной энергии
+    energy_service = EnergyService(db, redis)
+    await energy_service.restore_daily_energy(user.id)
+
+    # важный шаг: сброс кэша энергии
+    await redis.delete(f"user:{user.id}:energy")
     
     await message.answer(
         "✅ <b>День сброшен!</b>\n\n"
@@ -75,6 +80,7 @@ async def cmd_reset_day(message: Message, db: AsyncSession, redis):
         "Теперь можете начать новую игру с новым словом!",
         reply_markup=get_main_menu_keyboard()
     )
+
 
 @router.message(CommandStart())
 async def cmd_start(message: Message, state: FSMContext, db: AsyncSession):
@@ -261,8 +267,6 @@ async def cmd_help(message: Message):
 @router.message(Command("cancel"))
 async def cmd_cancel_game(message: Message, state: FSMContext, db: AsyncSession):
     """Отменить текущую игру (если зависла)"""
-    from datetime import datetime
-    from ...db.models.game import GameSession
     
     # Получаем пользователя
     stmt = select(User).where(User.telegram_id == message.from_user.id)

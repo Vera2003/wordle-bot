@@ -13,6 +13,8 @@ from ..schemas.game import LetterStatus, AttemptResult
 
 import structlog
 
+logger = structlog.getLogger(__name__)
+
 class GameService:
     """Сервис игровой логики Wordle"""
     
@@ -144,7 +146,7 @@ class GameService:
         target_word = session.gene.name
         guess = guess.upper()
 
-        logger.info(f"DEBUG: Game session ID={session.id}, gene.name='{session.gene.name}', expected_len={len(session.gene.name)}, guess_len={len(guess)}")
+        structlog.info(f"DEBUG: Game session ID={session.id}, gene.name='{session.gene.name}', expected_len={len(session.gene.name)}, guess_len={len(guess)}")
 
         # Валидация
         if len(guess) != len(target_word):

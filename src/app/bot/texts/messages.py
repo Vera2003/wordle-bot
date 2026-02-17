@@ -89,7 +89,7 @@ ENERGY_MESSAGE = """
 GAME_START_MESSAGE = """
 🎮 <b>Новая игра!</b>
 
-Загадан ген из {length} букв: <code>{"_" * length}</code>
+Загадан ген из {length} букв: <code>{hidden}</code>
 
 У вас <b>{attempts} попыток</b> и <b>{energy}⚡ энергии</b>
 
