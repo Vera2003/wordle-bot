@@ -204,12 +204,20 @@ ERROR_ALREADY_IN_GAME = """
 def format_attempt_result(result: list) -> str:
     """Форматирует результат попытки с эмодзи"""
     emoji_map = {
-        "correct": "🟨",  # правильная позиция
-        "present": "⬜",  # есть в слове
-        "absent": "⬛"    # нет в слове
+        "correct": "🟨",
+        "present": "⬜",
+        "absent": "⬛"
     }
     
-    letters = " ".join([item.letter for item in result])
-    colors = " ".join([emoji_map[item.status] for item in result]) 
+    def to_fullwidth(char: str) -> str:
+        """Конвертирует букву/цифру в полноширинный символ (2 колонки = ширина эмодзи)"""
+        if 'A' <= char <= 'Z':
+            return chr(ord('Ａ') + ord(char) - ord('A'))
+        if '0' <= char <= '9':
+            return chr(ord('０') + ord(char) - ord('0'))
+        return char
+    
+    letters = " ".join([to_fullwidth(item.letter) for item in result])
+    colors = " ".join([emoji_map[item.status] for item in result])
     
     return f"{letters}\n{colors}"

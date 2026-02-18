@@ -42,7 +42,7 @@ class Settings(BaseSettings):
     
     # Game settings
     max_attempts: int = Field(default=6)
-    daily_energy: int = Field(default=5)
+    daily_energy: int = Field(default=6)
     energy_per_attempt: int = Field(default=1)
     energy_per_hint: int = Field(default=2)
     bonus_energy: int = Field(default=3)

@@ -146,7 +146,7 @@ class GameService:
         target_word = session.gene.name
         guess = guess.upper()
 
-        structlog.info(f"DEBUG: Game session ID={session.id}, gene.name='{session.gene.name}', expected_len={len(session.gene.name)}, guess_len={len(guess)}")
+        logger.info(f"DEBUG: Game session ID={session.id}, gene.name='{session.gene.name}', expected_len={len(session.gene.name)}, guess_len={len(guess)}")
 
         # Валидация
         if len(guess) != len(target_word):

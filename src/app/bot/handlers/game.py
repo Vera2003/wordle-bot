@@ -2,13 +2,13 @@ from aiogram import Router, F
 from aiogram.types import Message, CallbackQuery
 from aiogram.fsm.context import FSMContext
 import structlog
-from sqlalchemy import select
+from sqlalchemy import select, func
 from sqlalchemy.ext.asyncio import AsyncSession
 import re
 from datetime import datetime, timedelta
+import random
 
-from ..keyboards.menu import get_main_menu_keyboard
-from ..keyboards.game import get_game_keyboard, get_game_finished_keyboard
+from ..keyboards.menu import get_main_menu_keyboard, get_game_keyboard#, get_game_finished_keyboard
 from ..texts.messages import (
     GAME_START_MESSAGE, ATTEMPT_RESULT_MESSAGE, WIN_MESSAGE, LOSE_MESSAGE,
     NO_ENERGY_MESSAGE, ERROR_INVALID_WORD, ERROR_ALREADY_IN_GAME,
@@ -17,27 +17,35 @@ from ..texts.messages import (
 from ..states.game import GameStates
 from ...db.models.user import User
 from ...db.models.game import GameSession
+from ...db.models.gene import Gene
 from ...services.game_service import GameService
 from ...services.energy_service import EnergyService
+from ...services.user_service import UserService
 from ...core.config import settings
+from ...utils.time_helpers import get_today_date, get_seconds_until_midnight, get_today_str
 
 router = Router()
 
 
 @router.message(F.text == "🎮 Играть")
 async def start_game(message: Message, state: FSMContext, db: AsyncSession, redis):
-    from datetime import datetime, timedelta
-    from ...db.models.game import GameSession
-    from ...db.models.gene import Gene
-    import random
+    """
+    Начинает новую игру или продолжает существующую
     
+    Логика:
+    1. Получаем пользователя через UserService
+    2. Закрываем все старые игры (не сегодняшние)
+    3. Получаем/создаём ген дня из Redis
+    4. Проверяем наличие активной игры на сегодня
+    5. Если есть - продолжаем, если нет - создаём новую
+    6. Выводим игровое сообщение с клавиатурой
+    """
     logger = structlog.get_logger(__name__)
     logger.info("🎮 Start game requested", user_id=message.from_user.id)
     
-    # Получаем пользователя
-    stmt = select(User).where(User.telegram_id == message.from_user.id)
-    result = await db.execute(stmt)
-    user = result.scalar_one_or_none()
+    # === 1. ПОЛУЧАЕМ ПОЛЬЗОВАТЕЛЯ ===
+    user_service = UserService(db)
+    user = await user_service.get_by_telegram_id(message.from_user.id)
     
     if not user:
         await message.answer("❌ Используйте /start")
@@ -45,28 +53,13 @@ async def start_game(message: Message, state: FSMContext, db: AsyncSession, redi
     
     logger.info("👤 User found", user_id=user.id, username=user.username)
     
-    # Сервисы
+    # === 2. ИНИЦИАЛИЗАЦИЯ СЕРВИСОВ ===
     game_service = GameService(db)
     energy_service = EnergyService(db, redis)
     
-    # Проверяем энергию
-    current_energy = await energy_service.get_user_energy(user.id)
-    logger.info("⚡ Energy check", energy=current_energy, required=settings.energy_per_attempt)
+    # === 3. ЗАКРЫВАЕМ СТАРЫЕ ИГРЫ (НЕ СЕГОДНЯШНИЕ) ===
+    today = get_today_date()
     
-    if current_energy < settings.energy_per_attempt:
-        await message.answer(
-            NO_ENERGY_MESSAGE.format(
-                current_energy=current_energy,
-                required_energy=settings.energy_per_attempt
-            ),
-            reply_markup=get_main_menu_keyboard()
-        )
-        return
-    
-    # НОВОЕ: Проверяем и завершаем старые игры
-    today = datetime.utcnow().date()
-    
-    # Находим все незавершенные игры
     old_games_query = select(GameSession).where(
         GameSession.user_id == user.id,
         GameSession.is_finished == False
@@ -78,25 +71,33 @@ async def start_game(message: Message, state: FSMContext, db: AsyncSession, redi
     
     # Завершаем игры, которые не сегодняшние
     for game in old_games:
-        if game.created_at.date() != today:
+        if game.started_at.date() != today:
             game.is_finished = True
             game.finished_at = datetime.utcnow()
-            logger.info("🗑️ Closed old game", game_id=game.id)
+            logger.info("🗑️ Closed old game", game_id=game.id, started=game.started_at)
     
     if old_games:
         await db.commit()
     
-    # Получаем ген дня из Redis
-    today_str = today.strftime("%Y-%m-%d")
+    # === 4. ПОЛУЧАЕМ/СОЗДАЁМ ГЕН ДНЯ ===
+    today_str = get_today_str()
     gene_of_day_key = f"gene_of_day:{today_str}"
     gene_id = await redis.get(gene_of_day_key)
     
     logger.info("🧬 Gene of day check", gene_id=gene_id)
     
     if gene_id:
+        # Ген дня уже выбран
         gene = await db.get(Gene, int(gene_id))
+        if not gene or not gene.is_active:
+            # Если ген удалён/деактивирован, выбираем новый
+            await redis.delete(gene_of_day_key)
+            gene = None
     else:
-        # Если нет гена дня, выбираем случайный
+        gene = None
+    
+    if not gene:
+        # Выбираем случайный активный ген
         query = select(Gene).where(Gene.is_active == True)
         result = await db.execute(query)
         genes = result.scalars().all()
@@ -109,12 +110,10 @@ async def start_game(message: Message, state: FSMContext, db: AsyncSession, redi
         logger.info("🎲 Random gene selected", gene_id=gene.id, gene_name=gene.name)
         
         # Сохраняем в Redis до конца дня
-        now = datetime.utcnow()
-        midnight = datetime.combine(now.date(), datetime.min.time()) + timedelta(days=1)
-        ttl = int((midnight - now).total_seconds())
+        ttl = get_seconds_until_midnight()
         await redis.set(gene_of_day_key, gene.id, ex=ttl)
     
-    # Проверяем, есть ли уже активная игра на сегодня с этим геном
+    # === 5. ПРОВЕРЯЕМ НАЛИЧИЕ АКТИВНОЙ ИГРЫ НА СЕГОДНЯ ===
     active_game_query = select(GameSession).where(
         GameSession.user_id == user.id,
         GameSession.gene_id == gene.id,
@@ -123,24 +122,34 @@ async def start_game(message: Message, state: FSMContext, db: AsyncSession, redi
     result = await db.execute(active_game_query)
     existing_game = result.scalar_one_or_none()
     
+    # Получаем текущую энергию (для отображения)
+    current_energy = await energy_service.get_user_energy(user.id)
+    
     if existing_game:
-        # Продолжаем существующую игру
+        # === 6A. ПРОДОЛЖАЕМ СУЩЕСТВУЮЩУЮ ИГРУ ===
         logger.info("▶️ Continuing existing game", game_id=existing_game.id, attempts=existing_game.attempts)
         
-        await state.set_state(GameStates.waiting_for_guess)  # ← ИСПРАВЛЕНО!
-        await state.update_data(
-            session_id=existing_game.id  # ← ИСПРАВЛЕНО! было game_id
+        await state.set_state(GameStates.waiting_for_guess)
+        await state.update_data(session_id=existing_game.id)
+        
+        can_use_hint = (
+            current_energy >= settings.energy_per_hint 
+            and not existing_game.hint_used
         )
         
         await message.answer(
-            f"🎮 Продолжаем игру!\n\n"
+            f"🎮 <b>Продолжаем игру!</b>\n\n"
             f"Слово из {len(gene.name)} букв\n"
-            f"Попыток использовано: {existing_game.attempts}/6\n\n"
-            f"Введите ваше слово:",
-            reply_markup=get_game_keyboard()
+            f"Попыток использовано: {existing_game.attempts}/{existing_game.max_attempts}\n"
+            f"Энергия: {current_energy}⚡ (для подсказок)\n\n"
+            f"Введите ваш вариант:",
+            reply_markup=get_game_keyboard(
+                has_energy=current_energy > 0,
+                can_use_hint=can_use_hint
+            )
         )
     else:
-        # Создаём новую игру
+        # === 6B. СОЗДАЁМ НОВУЮ ИГРУ ===
         logger.info("🆕 Creating new game", gene_id=gene.id, gene_name=gene.name)
         
         session = await game_service.start_game(user.id, gene.id)
@@ -148,25 +157,18 @@ async def start_game(message: Message, state: FSMContext, db: AsyncSession, redi
         
         logger.info("✅ Game created", session_id=session.id)
         
-        # Тратим энергию на первую попытку
-        await energy_service.spend_energy(user.id, settings.energy_per_attempt)
-        current_energy -= settings.energy_per_attempt
-        
-        logger.info("💰 Energy spent", remaining=current_energy)
-        
         # Сохраняем session_id в FSM
         await state.update_data(session_id=session.id)
-        await state.set_state(GameStates.waiting_for_guess)  # ← ИСПРАВЛЕНО!
+        await state.set_state(GameStates.waiting_for_guess)
         
         can_use_hint = current_energy >= settings.energy_per_hint
-
-        hidden_word = "_" * len(gene.name)
+        hidden_word = "_ " * len(gene.name)
 
         text = GAME_START_MESSAGE.format(
-        length=len(gene.name),
-        hidden=hidden_word,
-        attempts=session.max_attempts,
-        energy=current_energy
+            length=len(gene.name),
+            hidden=hidden_word.strip(),
+            attempts=session.max_attempts,
+            energy=current_energy
         )
         
         await message.answer(
@@ -240,13 +242,17 @@ async def process_guess(
         # Получаем текущую энергию
         current_energy = await energy_service.get_user_energy(user.id)
         
+        # Получаем сессию (нужна во всех ветках)
+        session = await db.get(GameSession, session_id)
+        await db.refresh(session, ['gene'])
+        
         # Форматируем результат
         result_viz = format_attempt_result(result.result)
         
         if result.is_correct:
             # ПОБЕДА!
-            session = await db.get(GameSession, session_id)
-            await db.refresh(session, ['gene'])
+            # session = await db.get(GameSession, session_id)
+            # await db.refresh(session, ['gene'])
             
             await message.answer(
                 WIN_MESSAGE.format(
@@ -257,15 +263,15 @@ async def process_guess(
                     gene_name=session.gene.name,
                     gene_description=session.gene.description,
                     total_points=user.total_points
-                ),
-                reply_markup=get_game_finished_keyboard(is_won=True)
+                )#,
+                #reply_markup=get_game_finished_keyboard(is_won=True)
             )
             await state.clear()
             
         elif result.is_game_over:
             # ПРОИГРЫШ
-            session = await db.get(GameSession, session_id)
-            await db.refresh(session, ['gene'])
+            # session = await db.get(GameSession, session_id)
+            # await db.refresh(session, ['gene'])
             
             await message.answer(
                 LOSE_MESSAGE.format(
@@ -273,8 +279,8 @@ async def process_guess(
                     gene_name=session.gene.name,
                     gene_description=session.gene.description,
                     total_points=user.total_points
-                ),
-                reply_markup=get_game_finished_keyboard(is_won=False)
+                )#,
+                #reply_markup=get_game_finished_keyboard(is_won=False)
             )
             await state.clear()
             
@@ -323,7 +329,10 @@ async def process_guess(
 
 @router.callback_query(F.data == "game:use_hint")
 async def use_hint(callback: CallbackQuery, state: FSMContext, db: AsyncSession, redis):
-    """Использует подсказку"""
+    """Использует подсказку в игре (платную, 2⚡)"""
+    from ...services.hint_service import HintService
+    from ...services.energy_service import EnergyService
+    
     data = await state.get_data()
     session_id = data.get('session_id')
     
@@ -335,8 +344,14 @@ async def use_hint(callback: CallbackQuery, state: FSMContext, db: AsyncSession,
     stmt = select(User).where(User.telegram_id == callback.from_user.id)
     result = await db.execute(stmt)
     user = result.scalar_one_or_none()
+    
     session = await db.get(GameSession, session_id)
     await db.refresh(session, ['gene'])
+    
+    # Проверяем, использована ли уже подсказка в игре
+    if session.hint_used:
+        await callback.answer("❌ Подсказка уже использована в этой игре!", show_alert=True)
+        return
     
     # Проверяем энергию
     energy_service = EnergyService(db, redis)
@@ -349,11 +364,6 @@ async def use_hint(callback: CallbackQuery, state: FSMContext, db: AsyncSession,
         )
         return
     
-    # Проверяем, использована ли уже подсказка
-    if session.hint_used:
-        await callback.answer("❌ Подсказка уже использована!", show_alert=True)
-        return
-    
     # Тратим энергию
     await energy_service.spend_energy(user.id, settings.energy_per_hint)
     current_energy -= settings.energy_per_hint
@@ -362,11 +372,15 @@ async def use_hint(callback: CallbackQuery, state: FSMContext, db: AsyncSession,
     session.hint_used = True
     await db.commit()
     
+    # Используем единый сервис для получения подсказки
+    hint_service = HintService(db, redis)
+    hint_result = await hint_service.show_hint(user.id, hint_type="in_game")
+    
+    # Показываем hint гена (игнорируем дневной лимит для платной подсказки)
     await callback.message.answer(
-        HINT_MESSAGE.format(
-            hint=session.gene.hint,
-            energy=current_energy
-        )
+        f"💡 <b>Подсказка о гене</b>\n\n"
+        f"{session.gene.hint}\n\n"
+        f"Энергия: {current_energy}⚡ (-{settings.energy_per_hint}⚡)"
     )
     await callback.answer("💡 Подсказка использована!")
 
@@ -400,8 +414,8 @@ async def surrender_game(callback: CallbackQuery, state: FSMContext, db: AsyncSe
             gene_name=session.gene.name,
             gene_description=session.gene.description,
             total_points=user.total_points
-        ),
-        reply_markup=get_game_finished_keyboard(is_won=False)
+        )#,
+        #reply_markup=get_game_finished_keyboard(is_won=False)
     )
     
     await state.clear()

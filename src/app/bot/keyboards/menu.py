@@ -42,29 +42,29 @@ def get_game_keyboard(has_energy: bool = True, can_use_hint: bool = True) -> Inl
         InlineKeyboardButton(text="❌ Сдаться", callback_data="game:surrender")
     )
     
-    builder.row(
-        InlineKeyboardButton(text="🏠 Главное меню", callback_data="menu:main")
-    )
+    # builder.row(
+    #     InlineKeyboardButton(text="🏠 Главное меню", callback_data="menu:main")
+    # )
     
     return builder.as_markup()
 
 
-def get_game_finished_keyboard(is_won: bool) -> InlineKeyboardMarkup:
-    """Клавиатура после завершения игры"""
-    builder = InlineKeyboardBuilder()
+# def get_game_finished_keyboard(is_won: bool) -> InlineKeyboardMarkup:
+#     """Клавиатура после завершения игры"""
+#     builder = InlineKeyboardBuilder()
     
-    builder.row(
-        InlineKeyboardButton(text="🎮 Играть ещё", callback_data="game:play_again")
-    )
-    builder.row(
-        InlineKeyboardButton(text="🏆 Мои достижения", callback_data="menu:achievements"),
-        InlineKeyboardButton(text="📊 Статистика", callback_data="menu:stats")
-    )
-    builder.row(
-        InlineKeyboardButton(text="🏠 Главное меню", callback_data="menu:main")
-    )
+#     builder.row(
+#         InlineKeyboardButton(text="🎮 Играть ещё", callback_data="game:play_again")
+#     )
+#     builder.row(
+#         InlineKeyboardButton(text="🏆 Мои достижения", callback_data="menu:achievements"),
+#         InlineKeyboardButton(text="📊 Статистика", callback_data="menu:stats")
+#     )
+#     builder.row(
+#         InlineKeyboardButton(text="🏠 Главное меню", callback_data="menu:main")
+#     )
     
-    return builder.as_markup()
+#     return builder.as_markup()
 
 
 def get_admin_keyboard() -> ReplyKeyboardMarkup:

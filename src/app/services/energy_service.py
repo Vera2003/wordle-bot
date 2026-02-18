@@ -6,6 +6,7 @@ import redis.asyncio as aioredis
 from ..db.models.user import User
 from ..core.config import settings
 
+from ..utils.time_helpers import get_seconds_until_midnight
 
 class EnergyService:
     """Сервис управления энергией"""
@@ -14,16 +15,14 @@ class EnergyService:
         self.db = db
         self.redis = redis
     
-    async def get_user_energy(self, user_id: int) -> int:
+    async def get_user_energy(self, user_id: int) -> int:  # ← убрали один уровень отступа
         """Получает текущую энергию пользователя"""
-        # Сначала проверяем кеш Redis
         cache_key = f"user:{user_id}:energy"
         cached_energy = await self.redis.get(cache_key)
         
         if cached_energy:
             return int(cached_energy)
         
-        # Если нет в кеше, получаем из БД
         query = select(User).where(User.id == user_id)
         result = await self.db.execute(query)
         user = result.scalar_one_or_none()
@@ -31,21 +30,16 @@ class EnergyService:
         if not user:
             return 0
         
-        # Проверяем, нужно ли восстановить энергию
         await self._check_and_restore_energy(user)
         
-        # Кешируем в Redis
-        await self.redis.set(cache_key, user.energy, ex=3600)  # TTL 1 час
+        # Кешируем на 1 час
+        await self.redis.set(cache_key, user.energy, ex=3600)
         
         return user.energy
     
+
     async def spend_energy(self, user_id: int, amount: int) -> bool:
-        """
-        Тратит энергию.
-        
-        Returns:
-            True если энергия успешно потрачена, False если недостаточно
-        """
+        """Тратит энергию"""
         query = select(User).where(User.id == user_id)
         result = await self.db.execute(query)
         user = result.scalar_one_or_none()
@@ -56,25 +50,25 @@ class EnergyService:
         user.energy -= amount
         await self.db.commit()
         
-        # Обновляем кеш
         cache_key = f"user:{user_id}:energy"
         await self.redis.set(cache_key, user.energy, ex=3600)
         
         return True
     
-    async def add_energy(self, user_id: int, amount: int):
-        """Добавляет энергию (бонус)"""
-        query = select(User).where(User.id == user_id)
-        result = await self.db.execute(query)
-        user = result.scalar_one_or_none()
-        
-        if user:
-            user.energy += amount
-            await self.db.commit()
+
+        async def add_energy(self, user_id: int, amount: int):
+            """Добавляет энергию"""
+            query = select(User).where(User.id == user_id)
+            result = await self.db.execute(query)
+            user = result.scalar_one_or_none()
             
-            # Обновляем кеш
-            cache_key = f"user:{user_id}:energy"
-            await self.redis.set(cache_key, user.energy, ex=3600)
+            if user:
+                user.energy += amount
+                await self.db.commit()
+                
+                cache_key = f"user:{user_id}:energy"
+                await self.redis.set(cache_key, user.energy, ex=3600)
+            
     
     async def _check_and_restore_energy(self, user: User):
         """Проверяет и восстанавливает энергию, если прошли сутки"""
