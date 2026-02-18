@@ -32,7 +32,7 @@ async def cmd_reset_day(message: Message, db: AsyncSession, redis):
     from ...services.energy_service import EnergyService
     from ...utils.time_helpers import get_today_str
     
-    ADMIN_IDS = [1085711478]
+    ADMIN_IDS = [1085711478]  # или settings.admin_ids
     if message.from_user.id not in ADMIN_IDS:
         await message.answer("❌ У вас нет доступа к этой команде")
         return
@@ -44,12 +44,48 @@ async def cmd_reset_day(message: Message, db: AsyncSession, redis):
         await message.answer("❌ Используйте /start")
         return
 
-    today = get_today_str()  # ← БЫЛО: datetime.utcnow().strftime("%Y-%m-%d")
+    today = get_today_str()
     gene_of_day_key = f"gene_of_day:{today}"
     user_hints_key = f"user:{user.id}:daily_hints:{today}"
 
     await redis.delete(gene_of_day_key)
     await redis.delete(user_hints_key)
+
+    # Закрываем и удаляем игровые данные
+    active_games_query = select(GameSession).where(
+        GameSession.user_id == user.id,
+        GameSession.is_finished == False
+    )
+    result = await db.execute(active_games_query)
+    active_games = result.scalars().all()
+
+    for game in active_games:
+        game.is_finished = True
+        game.finished_at = datetime.utcnow()
+
+    await db.execute(delete(GameSession).where(GameSession.user_id == user.id))
+    await db.execute(delete(UserAchievement).where(UserAchievement.user_id == user.id))
+    await db.execute(delete(UserPrize).where(UserPrize.user_id == user.id))
+
+    user.total_points = 0
+    await db.commit()
+
+    # Восстановление дневной энергии
+    energy_service = EnergyService(db, redis)
+    await energy_service.restore_daily_energy(user.id)
+
+    # Важный шаг: сброс кэша энергии
+    await redis.delete(f"user:{user.id}:energy")
+    
+    await message.answer(
+        "✅ <b>День сброшен!</b>\n\n"
+        "• Слово дня удалено\n"
+        "• Счетчик подсказок обнулен\n"
+        "• Активные игры завершены\n"
+        "• Энергия восстановлена\n\n"
+        "Теперь можете начать новую игру с новым словом!",
+        reply_markup=get_main_menu_keyboard()
+    )
 
 
 @router.message(CommandStart())
@@ -57,7 +93,6 @@ async def cmd_start(message: Message, state: FSMContext, db: AsyncSession):
     """Обработчик команды /start"""
     user_service = UserService(db)
     
-    # БЫЛО: 10 строк кода
     user = await user_service.get_or_create(
         telegram_id=message.from_user.id,
         username=message.from_user.username,
