@@ -1,10 +1,16 @@
-from fastapi import APIRouter, Depends, HTTPException
-from sqlalchemy.ext.asyncio import AsyncSession
+"""
+REST API: управление призами.
+
+Исправлен баг: в оригинале использовался неопределённый `Prize` вместо `PrizeType`.
+"""
 from typing import List
 
-from ...db.session import get_db
-from ...db.models.prize import PrizeType, UserPrize
+from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy import select
+from sqlalchemy.ext.asyncio import AsyncSession
+
+from ...db.models.prize import PrizeType, UserPrize
+from ...db.session import get_db
 
 router = APIRouter()
 
@@ -13,56 +19,57 @@ router = APIRouter()
 async def get_prizes(
     skip: int = 0,
     limit: int = 100,
-    db: AsyncSession = Depends(get_db)
+    db: AsyncSession = Depends(get_db),
 ):
-    """Получить список всех призов"""
-    result = await db.execute(
-        select(Prize).offset(skip).limit(limit)
-    )
+    """Список всех типов призов."""
+    result = await db.execute(select(PrizeType).offset(skip).limit(limit))
     prizes = result.scalars().all()
-    
+
     return [
         {
-            "id": prize.id,
-            "name": prize.name,
-            "description": prize.description,
-            "required_score": prize.required_score,
-            "image_url": prize.image_url,
-            "is_active": prize.is_active,
+            "id": p.id,
+            "name": p.name,
+            "title": p.title,
+            "description": p.description,
+            "prize_value": p.prize_value,
+            "is_active": p.is_active,
         }
-        for prize in prizes
+        for p in prizes
     ]
 
 
 @router.get("/{prize_id}", response_model=dict)
-async def get_prize(
-    prize_id: int,
-    db: AsyncSession = Depends(get_db)
-):
-    """Получить информацию о конкретном призе"""
-    result = await db.execute(
-        select(Prize).where(Prize.id == prize_id)
-    )
-    prize = result.scalar_one_or_none()
-    
+async def get_prize(prize_id: int, db: AsyncSession = Depends(get_db)):
+    """Информация о конкретном призе."""
+    prize = await db.get(PrizeType, prize_id)
     if not prize:
-        raise HTTPException(status_code=404, detail="Prize not found")
-    
+        raise HTTPException(status_code=404, detail="Приз не найден")
+
     return {
         "id": prize.id,
         "name": prize.name,
+        "title": prize.title,
         "description": prize.description,
-        "required_score": prize.required_score,
-        "image_url": prize.image_url,
+        "prize_value": prize.prize_value,
         "is_active": prize.is_active,
     }
 
 
 @router.get("/user/{user_id}", response_model=List[dict])
-async def get_user_prizes(
-    user_id: int,
-    db: AsyncSession = Depends(get_db)
-):
-    """Получить призы пользователя"""
-    # TODO: Implement user prizes logic
-    return []
+async def get_user_prizes(user_id: int, db: AsyncSession = Depends(get_db)):
+    """Призы конкретного пользователя."""
+    result = await db.execute(
+        select(UserPrize).where(UserPrize.user_id == user_id)
+    )
+    user_prizes = result.scalars().all()
+
+    return [
+        {
+            "id": up.id,
+            "prize_type_id": up.prize_type_id,
+            "is_used": up.is_used,
+            "awarded_at": up.awarded_at.isoformat(),
+            "used_at": up.used_at.isoformat() if up.used_at else None,
+        }
+        for up in user_prizes
+    ]

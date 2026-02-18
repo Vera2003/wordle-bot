@@ -45,6 +45,6 @@ def setup_logging():
     root_logger.setLevel(logging.INFO)
     
     # Устанавливаем уровень для aiogram
-    structlog.getLogger("aiogram").setLevel(logging.INFO)
-    structlog.getLogger("httpx").setLevel(logging.WARNING)
-    structlog.getLogger("httpcore").setLevel(logging.WARNING)
+    logging.getLogger("aiogram").setLevel(logging.INFO)
+    logging.getLogger("httpx").setLevel(logging.WARNING)
+    logging.getLogger("httpcore").setLevel(logging.WARNING)

@@ -32,8 +32,8 @@ async def cmd_reset_day(message: Message, db: AsyncSession, redis):
     from ...services.energy_service import EnergyService
     from ...utils.time_helpers import get_today_str
     
-    ADMIN_IDS = [1085711478]  # или settings.admin_ids
-    if message.from_user.id not in ADMIN_IDS:
+    # ADMIN_IDS = [1085711478]  # или settings.admin_ids
+    if message.from_user.id not in settings.admin_ids:
         await message.answer("❌ У вас нет доступа к этой команде")
         return
 

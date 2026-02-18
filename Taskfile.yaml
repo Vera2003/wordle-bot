@@ -6,33 +6,54 @@ env:
 
 tasks:
   # === Разработка ===
-  
+
   install:
     desc: "Установить зависимости через Poetry"
     cmds:
       - poetry install --with dev
 
   dev:
-    desc: "Запустить бота локально (без Docker)"
+    desc: "Запустить бота локально в polling режиме (без Docker)"
     cmds:
-      - poetry run python -m src.app.bot.main
+      - poetry run python -m src.app.bot_polling
 
   api:
-    desc: "Запустить API локально (без Docker)"
+    desc: "Запустить API локально в webhook режиме (без Docker)"
     cmds:
       - poetry run uvicorn src.app.main:app --reload --host 0.0.0.0 --port 8000
 
   # === Docker ===
-  
+
   build:
     desc: "Собрать Docker образы"
     cmds:
       - docker-compose -f $COMPOSE_FILE build
 
-  up:
-    desc: "Запустить все сервисы"
+  up-webhook:
+    desc: "Запустить в webhook режиме (нужен домен)"
     cmds:
-      - docker-compose -f $COMPOSE_FILE up -d
+      - docker-compose -f $COMPOSE_FILE up -d api postgres redis
+    env:
+      USE_WEBHOOK: "true"
+
+  up-polling:
+    desc: "Запустить в polling режиме (разработка)"
+    cmds:
+      - docker-compose -f $COMPOSE_FILE --profile polling up -d
+    env:
+      USE_WEBHOOK: "false"
+
+  up:
+    desc: "Запустить (автоопределение режима по WEBHOOK_DOMAIN)"
+    cmds:
+      - |
+        if [ -z "$WEBHOOK_DOMAIN" ] || [ "$USE_WEBHOOK" = "false" ]; then
+          echo "🔄 Запуск в POLLING режиме"
+          task up-polling
+        else
+          echo "🔗 Запуск в WEBHOOK режиме"
+          task up-webhook
+        fi
 
   down:
     desc: "Остановить все сервисы"
@@ -48,7 +69,7 @@ tasks:
   logs:
     desc: "Показать логи (параметр: service=bot/api/postgres/redis)"
     cmds:
-      - docker-compose -f $COMPOSE_FILE logs -f {{.service | default "bot"}}
+      - docker-compose -f $COMPOSE_FILE logs -f {{.service | default "api"}}
 
   ps:
     desc: "Показать статус контейнеров"
@@ -56,24 +77,24 @@ tasks:
       - docker-compose -f $COMPOSE_FILE ps
 
   # === База данных ===
-  
+
   db-init:
     desc: "Полная инициализация БД (гены + достижения + призы)"
     cmds:
       - poetry run python scripts/init_genes.py
-  
+
   db-seed:
     desc: "Добавить тестовые данные"
     cmds:
       - poetry run python scripts/seed_test_data.py
-  
+
   db-reset:
     desc: "Полный сброс БД и реинициализация"
     cmds:
       - task: down
       - docker volume rm genetic-wordle-bot_postgres-data || true
       - task: up
-      - task: db-init-full
+      - task: db-init
 
   db-migrate:
     desc: "Создать новую миграцию (параметр: message='описание')"
@@ -96,7 +117,7 @@ tasks:
       - docker-compose -f $COMPOSE_FILE exec postgres psql -U postgres -d genetic_wordle
 
   # === Тестирование ===
-  
+
   test:
     desc: "Запустить тесты"
     cmds:
@@ -114,7 +135,7 @@ tasks:
       - docker-compose -f $COMPOSE_TEST_FILE down
 
   # === Линтеры и форматирование ===
-  
+
   lint:
     desc: "Запустить все линтеры"
     cmds:
@@ -154,20 +175,14 @@ tasks:
       - poetry run pre-commit run --all-files
 
   # === Утилиты ===
-  
+
   clean:
     desc: "Очистить временные файлы"
     cmds:
       - find . -type d -name "__pycache__" -exec rm -rf {} +
       - find . -type d -name "*.egg-info" -exec rm -rf {} +
       - find . -type d -name ".pytest_cache" -exec rm -rf {} +
-      - find . -type d -name ".coverage" -exec rm -rf {} +
       - rm -rf htmlcov
-
-  shell-bot:
-    desc: "Войти в shell контейнера бота"
-    cmds:
-      - docker-compose -f $COMPOSE_FILE exec bot sh
 
   shell-api:
     desc: "Войти в shell контейнера API"
@@ -183,33 +198,3 @@ tasks:
     desc: "Восстановить базу из бэкапа (параметр: file=backup.sql)"
     cmds:
       - docker-compose -f $COMPOSE_FILE exec -T postgres psql -U postgres genetic_wordle < {{.file}}
-
-  # Webhook режим (production)
-  up-webhook:
-    desc: "Запустить в webhook режиме (нужен домен)"
-    cmds:
-      - docker-compose -f $COMPOSE_FILE up -d api postgres redis
-    env:
-      USE_WEBHOOK: "true"
-  
-  # Polling режим (development)
-  up-polling:
-    desc: "Запустить в polling режиме (разработка)"
-    cmds:
-      - docker-compose -f $COMPOSE_FILE --profile polling up -d
-    env:
-      USE_WEBHOOK: "false"
-  
-  # По умолчанию - webhook если домен указан
-  up:
-    desc: "Запустить (автоопределение режима)"
-    cmds:
-      - |
-        if [ -z "$WEBHOOK_DOMAIN" ] || [ "$USE_WEBHOOK" = "false" ]; then
-          echo "🔄 Запуск в POLLING режиме"
-          task up-polling
-        else
-          echo "🔗 Запуск в WEBHOOK режиме"
-          task up-webhook
-        fi
-

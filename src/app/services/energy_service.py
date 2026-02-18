@@ -56,18 +56,18 @@ class EnergyService:
         return True
     
 
-        async def add_energy(self, user_id: int, amount: int):
-            """Добавляет энергию"""
-            query = select(User).where(User.id == user_id)
-            result = await self.db.execute(query)
-            user = result.scalar_one_or_none()
+    async def add_energy(self, user_id: int, amount: int):
+        """Добавляет энергию"""
+        query = select(User).where(User.id == user_id)
+        result = await self.db.execute(query)
+        user = result.scalar_one_or_none()
             
-            if user:
-                user.energy += amount
-                await self.db.commit()
+        if user:
+            user.energy += amount
+            await self.db.commit()
                 
-                cache_key = f"user:{user_id}:energy"
-                await self.redis.set(cache_key, user.energy, ex=3600)
+            cache_key = f"user:{user_id}:energy"
+            await self.redis.set(cache_key, user.energy, ex=3600)
             
     
     async def _check_and_restore_energy(self, user: User):
