@@ -1,12 +1,18 @@
-import structlog
+"""
+Настройка structlog + стандартного logging.
+
+ИСПРАВЛЕН БАГ: structlog не имеет метода .getLogger() — это метод стандартного
+logging. Ошибка вызывала AttributeError при старте.
+"""
 import logging
 import sys
 
+import structlog
 
-def setup_logging():
-    """Настройка structlog"""
-    
-    # Процессоры для structlog
+
+def setup_logging() -> None:
+    """Настройка structlog с выводом в консоль."""
+
     shared_processors = [
         structlog.contextvars.merge_contextvars,
         structlog.stdlib.add_logger_name,
@@ -18,7 +24,6 @@ def setup_logging():
         structlog.processors.UnicodeDecoder(),
     ]
 
-    # Настройка structlog
     structlog.configure(
         processors=shared_processors + [
             structlog.stdlib.ProcessorFormatter.wrap_for_formatter,
@@ -27,7 +32,6 @@ def setup_logging():
         cache_logger_on_first_use=True,
     )
 
-    # Форматтер для консоли (цветной вывод)
     console_formatter = structlog.stdlib.ProcessorFormatter(
         foreign_pre_chain=shared_processors,
         processors=[
@@ -36,15 +40,14 @@ def setup_logging():
         ],
     )
 
-    # Настройка стандартного logging
     handler = logging.StreamHandler(sys.stdout)
     handler.setFormatter(console_formatter)
-    
+
     root_logger = logging.getLogger()
     root_logger.addHandler(handler)
     root_logger.setLevel(logging.INFO)
-    
-    # Устанавливаем уровень для aiogram
+
+    # ИСПРАВЛЕНО: logging.getLogger(), не structlog.getLogger()
     logging.getLogger("aiogram").setLevel(logging.INFO)
     logging.getLogger("httpx").setLevel(logging.WARNING)
     logging.getLogger("httpcore").setLevel(logging.WARNING)

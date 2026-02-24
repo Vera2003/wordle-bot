@@ -1,7 +1,8 @@
 """
 Сервис подсказок.
 
-Убрана дублирующаяся логика get_gene_of_day — теперь делегируем GeneOfDayService.
+Исправлен баг: ранее db.scalar(select(GameSession)...) мог вернуть завершённую
+игру с ДРУГИМ геном (не геном дня). Теперь явно фильтруем по gene_id.
 """
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -12,7 +13,7 @@ from ..utils.time_helpers import get_seconds_until_midnight, get_today_date, get
 from .gene_of_day_service import GeneOfDayService
 
 _DIFFICULTY_EMOJI = {
-    "easy": "🟢 Легкая",
+    "easy": "🟢 Лёгкая",
     "medium": "🟡 Средняя",
     "hard": "🔴 Сложная",
 }
@@ -44,17 +45,18 @@ class HintService:
         """
         Показать подсказку дня (бесплатную).
 
-        Returns dict с полями:
-            success (bool), text (str) — если успешно
-            success (bool), message (str) — если лимит/игра уже закончена
+        Returns dict:
+            {"success": True, "text": "...", "hint_number": 1|2}
+            {"success": False, "message": "..."}
         """
         gene = await self._gene_of_day.get()
         hints_used = await self.get_daily_hint_count(user_id)
 
-        # Проверяем, завершена ли игра сегодня
+        # ИСПРАВЛЕНО: проверяем завершение именно игры с геном дня
         finished_game = await self.db.scalar(
             select(GameSession).where(
                 GameSession.user_id == user_id,
+                GameSession.gene_id == gene.id,  # ← только ген дня!
                 GameSession.is_finished == True,
                 func.date(GameSession.started_at) == get_today_date(),
             )
@@ -66,7 +68,7 @@ class HintService:
                 "error": "game_finished",
                 "message": (
                     f"🔒 <b>Подсказки недоступны</b>\n\n"
-                    f"Вы уже завершили игру на сегодня — вы {outcome}.\n"
+                    f"Вы уже завершили сегодняшнюю игру — вы {outcome}.\n"
                     f"Новая игра и подсказки будут доступны завтра в 00:00 🌙"
                 ),
             }

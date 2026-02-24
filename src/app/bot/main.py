@@ -1,10 +1,13 @@
 """
 Точка входа бота в polling-режиме (для локальной разработки).
 
-Запуск: poetry run python -m src.app.bot_polling
-Или через Taskfile: task dev
+Запуск:  poetry run python -m src.app.bot.main
+         task dev
 
-Webhook-режим (production) запускается через src/app/main.py (uvicorn).
+Webhook-режим (production): src/app/main.py (uvicorn)
+
+ИСПРАВЛЕНО: импорты были 'from .bot.handlers' — неверно для файла внутри пакета bot/.
+Правильно: 'from .handlers'.
 """
 import asyncio
 
@@ -16,19 +19,19 @@ from aiogram.enums import ParseMode
 from aiogram.fsm.storage.redis import RedisStorage
 from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine
 
-from .bot.handlers import achievements, admin, game, start
-from .bot.middleware.db import DbSessionMiddleware
-from .bot.middleware.logging import LoggingMiddleware
-from .bot.middleware.user import UserMiddleware
-from .core.config import settings
-from .core.logging_config import setup_logging
+from .handlers import achievements, admin, game, start
+from .middleware.db import DbSessionMiddleware
+from .middleware.logging import LoggingMiddleware
+from .middleware.user import UserMiddleware
+from ..core.config import settings
+from ..core.logging_config import setup_logging
 
-# Импортируем все модели
-from .db.models.achievements import AchievementType, UserAchievement  # noqa: F401
-from .db.models.game import GameAttempt, GameSession  # noqa: F401
-from .db.models.gene import Gene  # noqa: F401
-from .db.models.prize import PrizeType, UserPrize  # noqa: F401
-from .db.models.user import User  # noqa: F401
+# Импортируем все модели чтобы SQLAlchemy их видел
+from ..db.models.achievements import AchievementType, UserAchievement  # noqa: F401
+from ..db.models.game import GameAttempt, GameSession  # noqa: F401
+from ..db.models.gene import Gene  # noqa: F401
+from ..db.models.prize import PrizeType, UserPrize  # noqa: F401
+from ..db.models.user import User  # noqa: F401
 
 setup_logging()
 logger = structlog.get_logger(__name__)

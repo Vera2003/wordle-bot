@@ -1,11 +1,5 @@
 """
 Хендлеры игрового процесса.
-
-Исправления (DRY / SOLID):
-- Все импорты перенесены на уровень модуля (убраны inline-импорты внутри функций)
-- user: User | None инжектируется через UserMiddleware (нет повторного fetch)
-- Логика "ген дня" делегирована GeneOfDayService
-- MENU_TEXTS вынесен в константу уровня модуля
 """
 import re
 from datetime import datetime
@@ -33,13 +27,12 @@ from ...db.models.user import User
 from ...services.energy_service import EnergyService
 from ...services.game_service import GameService
 from ...services.gene_of_day_service import GeneOfDayService
-from ...services.hint_service import HintService
 from ...utils.time_helpers import get_today_date
 
 router = Router()
 logger = structlog.get_logger(__name__)
 
-# Тексты кнопок меню — фильтр для игрового состояния
+# Тексты кнопок главного меню — фильтруем их в игровом состоянии
 MENU_TEXTS = frozenset({
     "🏠 Главное меню",
     "📊 Статистика",
@@ -86,7 +79,7 @@ async def start_game(
     if stale_games:
         await db.commit()
 
-    # Получаем ген дня через сервис
+    # Получаем ген дня
     try:
         gene = await gene_of_day_service.get()
     except ValueError:
@@ -102,6 +95,26 @@ async def start_game(
         )
     )
     existing_game = active_result.scalar_one_or_none()
+
+    # Проверяем — может уже сыграл сегодня
+    finished_result = await db.execute(
+        select(GameSession).where(
+            GameSession.user_id == user.id,
+            GameSession.gene_id == gene.id,
+            GameSession.is_finished == True,
+        )
+    )
+    finished_game = finished_result.scalar_one_or_none()
+    if finished_game:
+        result_text = "победой 🎉" if finished_game.is_won else "поражением 😔"
+        await message.answer(
+            f"✋ Вы уже сыграли сегодня — с {result_text}\n\n"
+            f"Слово было: <b>{gene.name}</b>\n\n"
+            f"Новая игра будет доступна завтра в 00:00 🌙",
+            reply_markup=get_main_menu_keyboard(),
+        )
+        return
+
     current_energy = await energy_service.get_user_energy(user.id)
 
     if existing_game:
@@ -109,9 +122,7 @@ async def start_game(
         await state.set_state(GameStates.waiting_for_guess)
         await state.update_data(session_id=existing_game.id)
 
-        can_use_hint = (
-            current_energy >= settings.energy_per_hint and not existing_game.hint_used
-        )
+        can_use_hint = current_energy >= settings.energy_per_hint and not existing_game.hint_used
         await message.answer(
             f"🎮 <b>Продолжаем игру!</b>\n\n"
             f"Слово из {len(gene.name)} букв\n"
@@ -168,8 +179,8 @@ async def process_guess(
     data = await state.get_data()
     session_id = data.get("session_id")
     if not session_id:
-        logger.error("❌ No session_id in FSM")
-        await message.answer("❌ Игра не найдена. Начните новую игру.")
+        logger.error("❌ No session_id in FSM state")
+        await message.answer("❌ Игра не найдена. Начните новую.")
         await state.clear()
         return
 
@@ -272,6 +283,10 @@ async def use_hint(
         return
 
     session = await db.get(GameSession, session_id)
+    if not session:
+        await callback.answer("❌ Игра не найдена", show_alert=True)
+        return
+
     await db.refresh(session, ["gene"])
 
     if session.hint_used:
@@ -283,7 +298,7 @@ async def use_hint(
 
     if current_energy < settings.energy_per_hint:
         await callback.answer(
-            f"❌ Недостаточно энергии! Нужно {settings.energy_per_hint}⚡",
+            f"❌ Недостаточно энергии! Нужно {settings.energy_per_hint}⚡, у вас {current_energy}⚡",
             show_alert=True,
         )
         return
@@ -316,6 +331,10 @@ async def surrender_game(
         return
 
     session = await db.get(GameSession, session_id)
+    if not session:
+        await callback.answer("❌ Игра не найдена", show_alert=True)
+        return
+
     session.is_finished = True
     session.finished_at = datetime.utcnow()
     await db.commit()

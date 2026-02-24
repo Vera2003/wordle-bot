@@ -1,15 +1,27 @@
-from typing import Callable, Dict, Any, Awaitable
+"""
+Middleware для инъекции текущего пользователя в data['user'].
+
+ВАЖНО: использует get_by_telegram_id (НЕ get_or_create).
+Создание пользователя происходит ТОЛЬКО в cmd_start (/start).
+
+Если пользователь написал боту без /start → data['user'] = None,
+хендлер отвечает "❌ Используйте /start".
+
+ВАЖНО ПРО AIOGRAM 3:
+При регистрации через dp.update.middleware() event — это объект Update,
+а НЕ Message/CallbackQuery напрямую. from_user нужно извлекать через
+Update.message, Update.callback_query и т.д.
+"""
+from typing import Any, Awaitable, Callable, Dict
+
 from aiogram import BaseMiddleware
-from aiogram.types import TelegramObject, Message, CallbackQuery
+from aiogram.types import TelegramObject, Update
 
 from ...services.user_service import UserService
 
 
 class UserMiddleware(BaseMiddleware):
-    """
-    Middleware для загрузки/создания пользователя по Telegram ID
-    и передачи объекта User в хендлеры через data['user'].
-    """
+    """Добавляет data['user'] (User | None) для всех хендлеров."""
 
     async def __call__(
         self,
@@ -17,32 +29,31 @@ class UserMiddleware(BaseMiddleware):
         event: TelegramObject,
         data: Dict[str, Any],
     ) -> Any:
-        db = data.get('db')
+        db = data.get("db")
         if not db:
-            raise RuntimeError("Db session is missing in UserMiddleware. Make sure DbSessionMiddleware is applied first.")
-
-        user_service = UserService(db)
-        telegram_id = None
-        username = None
-        full_name = None
-
-        # Получаем данные пользователя из события
-        if isinstance(event, Message) or isinstance(event, CallbackQuery):
-            tg_user = event.from_user
-            telegram_id = tg_user.id
-            username = tg_user.username
-            full_name = tg_user.full_name
-
-        if telegram_id:
-            # Получаем или создаём пользователя
-            user = await user_service.get_or_create(
-                telegram_id=telegram_id,
-                username=username,
-                full_name=full_name
+            raise RuntimeError(
+                "DB session missing in UserMiddleware. "
+                "DbSessionMiddleware must be registered before UserMiddleware."
             )
-            data['user'] = user  # передаем в хендлер
-        else:
-            data['user'] = None
 
-        # Продолжаем цепочку обработки
+        # event при dp.update.middleware — это Update, а не Message/CallbackQuery.
+        # Извлекаем from_user из конкретного типа события внутри Update.
+        from_user = None
+        if isinstance(event, Update):
+            inner = (
+                event.message
+                or event.callback_query
+                or event.edited_message
+                or event.channel_post
+                or event.inline_query
+            )
+            if inner:
+                from_user = getattr(inner, "from_user", None)
+
+        if from_user:
+            user_service = UserService(db)
+            data["user"] = await user_service.get_by_telegram_id(from_user.id)
+        else:
+            data["user"] = None
+
         return await handler(event, data)
