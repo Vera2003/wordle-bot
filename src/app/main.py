@@ -68,7 +68,7 @@ async def lifespan(app: FastAPI):
         # Порядок middleware важен: Logging → DbSession → User
         dp.update.middleware(LoggingMiddleware())
         dp.update.middleware(DbSessionMiddleware(sessionmaker, redis_client))
-        dp.update.middleware(UserMiddleware())
+        # dp.update.middleware(UserMiddleware())
 
         dp.include_router(start.router)
         dp.include_router(game.router)

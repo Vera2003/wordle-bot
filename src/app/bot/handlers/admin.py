@@ -27,6 +27,8 @@ def is_admin(user_id: int) -> bool:
 
 @router.message(Command("admin"))
 async def cmd_admin(message: Message, state: FSMContext):
+    if message.from_user is None:
+        return
     if not is_admin(message.from_user.id):
         await message.answer("❌ У вас нет прав администратора")
         return
@@ -46,6 +48,8 @@ async def back_to_menu(message: Message, state: FSMContext):
 
 @router.message(F.text == "➕ Добавить ген", AdminStates.admin_menu)
 async def add_gene_start(message: Message, state: FSMContext):
+    if message.from_user is None:
+        return
     if not is_admin(message.from_user.id):
         return
 
@@ -68,7 +72,11 @@ async def cancel_adding_gene(message: Message, state: FSMContext):
 
 @router.message(AdminStates.adding_gene)
 async def process_adding_gene(message: Message, state: FSMContext, db: AsyncSession):
+    if message.from_user is None:
+        return
     if not is_admin(message.from_user.id):
+        return
+    if message.text is None:
         return
 
     data = await state.get_data()
@@ -144,6 +152,8 @@ async def process_adding_gene(message: Message, state: FSMContext, db: AsyncSess
 
 @router.message(F.text == "📊 Статистика всех игроков", AdminStates.admin_menu)
 async def show_global_stats(message: Message, db: AsyncSession):
+    if message.from_user is None:
+        return
     if not is_admin(message.from_user.id):
         return
 
@@ -167,6 +177,8 @@ async def show_global_stats(message: Message, db: AsyncSession):
 
 @router.message(F.text == "📝 Редактировать ген", AdminStates.admin_menu)
 async def list_genes_for_edit(message: Message, db: AsyncSession):
+    if message.from_user is None:
+        return
     if not is_admin(message.from_user.id):
         return
 

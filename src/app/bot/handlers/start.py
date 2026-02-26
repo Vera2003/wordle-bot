@@ -45,6 +45,8 @@ async def cmd_reset_day(
     user: User | None,
 ):
     """Dev-команда: полный сброс дня. Только для админов."""
+    if message.from_user is None:
+        return
     if message.from_user.id not in settings.admin_ids:
         await message.answer("❌ У вас нет доступа к этой команде")
         return
@@ -97,6 +99,9 @@ async def cmd_start(
     Если user уже есть — просто показываем меню.
     """
     if user is None:
+        if message.from_user is None:
+            await message.answer("❌ Не удалось определить пользователя")
+            return
         user_service = UserService(db)
         user = await user_service.get_or_create(
             telegram_id=message.from_user.id,
@@ -118,8 +123,16 @@ async def show_main_menu(event: Message | CallbackQuery, state: FSMContext):
     await state.set_state(GameStates.main_menu)
 
     if isinstance(event, CallbackQuery):
-        await event.message.edit_text(MAIN_MENU_MESSAGE, reply_markup=get_main_menu_keyboard())
+        # edit_text принимает только InlineKeyboardMarkup, но главное меню —
+        # ReplyKeyboardMarkup. Удаляем старое сообщение и отправляем новое.
+        if isinstance(event.message, Message):
+            await event.message.delete()
         await event.answer()
+        await event.bot.send_message(  # type: ignore[union-attr]
+            chat_id=event.from_user.id,
+            text=MAIN_MENU_MESSAGE,
+            reply_markup=get_main_menu_keyboard(),
+        )
     else:
         await event.answer(MAIN_MENU_MESSAGE, reply_markup=get_main_menu_keyboard())
 
@@ -148,7 +161,8 @@ async def show_daily_hint(
     result = await hint_service.show_hint(user.id, hint_type="daily")
 
     # show_hint возвращает {"success": True, "text": ...} или {"success": False, "message": ...}
-    text = result.get("text") if result["success"] else result.get("message", "❌ Ошибка")
+    # text = result.get("text") if result["success"] else result.get("message", "❌ Ошибка")
+    text = result.get("text") or result.get("message") or "❌ Ошибка"
     await message.answer(text, reply_markup=get_main_menu_keyboard())
 
 

@@ -202,22 +202,43 @@ ERROR_ALREADY_IN_GAME = """
 
 
 def format_attempt_result(result: list) -> str:
-    """Форматирует результат попытки с эмодзи"""
-    emoji_map = {
-        "correct": "🟨",
-        "present": "⬜",
-        "absent": "⬛"
-    }
+    emoji_map = {"correct": "🟨", "present": "⬜", "absent": "⬛"}
     
-    def to_fullwidth(char: str) -> str:
-        """Конвертирует букву/цифру в полноширинный символ (2 колонки = ширина эмодзи)"""
-        if 'A' <= char <= 'Z':
-            return chr(ord('Ａ') + ord(char) - ord('A'))
-        if '0' <= char <= '9':
-            return chr(ord('０') + ord(char) - ord('0'))
-        return char
+    def get_symbol_width(char: str) -> int:
+        import unicodedata
+        return 2 if unicodedata.east_asian_width(char) in ('F', 'W') else 1
     
-    letters = " ".join([to_fullwidth(item.letter) for item in result])
-    colors = " ".join([emoji_map[item.status] for item in result])
+    SLOT_WIDTH = 3  # Всегда 3 колонки на слот
     
-    return f"{letters}\n{colors}"
+    def pad_center(text: str, width: int) -> str:
+        text_len = sum(get_symbol_width(c) for c in text)
+        if text_len >= width:
+            return text[:width]
+        left = (width - text_len) // 2
+        right = width - text_len - left
+        return " " * left + text + " " * right
+    
+    letters_row = " "
+    colors_row = ""
+    
+    for i, item in enumerate(result, start=1):
+        ch = item.letter.upper()
+        emoji = emoji_map[item.status]
+        
+        # Базовый паддинг слота
+        letter_slot = pad_center(ch, SLOT_WIDTH)
+        color_slot = pad_center(emoji, SLOT_WIDTH)
+        
+        # Пробелы: 1 для первой позиции, 2 для всех остальных
+        # extra_spaces = " " * (1 if i == 1 else 2)
+        extra_spaces = " " * 2
+        
+        letters_row += letter_slot + extra_spaces
+        colors_row += color_slot
+    
+    return f"```\n{letters_row}\n{colors_row}\n```"
+
+
+
+
+

@@ -52,11 +52,11 @@ async def start_game(
     redis,
     user: User | None,
 ):
-    logger.info("🎮 Start game requested", user_id=message.from_user.id)
-
     if not user:
         await message.answer("❌ Используйте /start")
         return
+
+    logger.info("🎮 Start game requested", user_id=user.id)
 
     game_service = GameService(db)
     energy_service = EnergyService(db, redis)
@@ -169,12 +169,12 @@ async def process_guess(
     redis,
     user: User | None,
 ):
-    logger.info("🎯 Guess received", user_id=message.from_user.id, guess=message.text)
-
     if not user:
         await message.answer("❌ Используйте /start")
         await state.clear()
         return
+
+    logger.info("🎯 Guess received", user_id=user.id, guess=message.text)
 
     data = await state.get_data()
     session_id = data.get("session_id")
@@ -182,6 +182,9 @@ async def process_guess(
         logger.error("❌ No session_id in FSM state")
         await message.answer("❌ Игра не найдена. Начните новую.")
         await state.clear()
+        return
+
+    if not message.text:
         return
 
     guess = message.text.strip().upper()
@@ -197,6 +200,10 @@ async def process_guess(
         current_energy = await energy_service.get_user_energy(user.id)
 
         session = await db.get(GameSession, session_id)
+        if not session:
+            await message.answer("❌ Игровая сессия не найдена")
+            await state.clear()
+            return
         await db.refresh(session, ["gene"])
         result_viz = format_attempt_result(result.result)
 
@@ -309,11 +316,12 @@ async def use_hint(
     session.hint_used = True
     await db.commit()
 
-    await callback.message.answer(
-        f"💡 <b>Подсказка о гене</b>\n\n"
-        f"{session.gene.hint}\n\n"
-        f"Энергия: {current_energy}⚡ (-{settings.energy_per_hint}⚡)"
-    )
+    if isinstance(callback.message, Message):
+        await callback.message.answer(
+            f"💡 <b>Подсказка о гене</b>\n\n"
+            f"{session.gene.hint}\n\n"
+            f"Энергия: {current_energy}⚡ (-{settings.energy_per_hint}⚡)"
+        )
     await callback.answer("💡 Подсказка использована!")
 
 
@@ -340,13 +348,17 @@ async def surrender_game(
     await db.commit()
     await db.refresh(session, ["gene"])
 
-    await callback.message.edit_text(
-        LOSE_MESSAGE.format(
-            word=session.gene.name,
-            gene_name=session.gene.name,
-            gene_description=session.gene.description,
-            total_points=user.total_points if user else 0,
-        )
+    lose_text = LOSE_MESSAGE.format(
+        word=session.gene.name,
+        gene_name=session.gene.name,
+        gene_description=session.gene.description,
+        total_points=user.total_points if user else 0,
     )
+    if isinstance(callback.message, Message):
+        await callback.message.edit_text(lose_text)
+    else:
+        await callback.bot.send_message(  # type: ignore[union-attr]
+            chat_id=callback.from_user.id, text=lose_text
+        )
     await state.clear()
     await callback.answer("Игра завершена")
