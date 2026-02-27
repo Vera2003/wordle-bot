@@ -29,7 +29,7 @@ async def show_stats(
     event: Message | CallbackQuery,
     db: AsyncSession,
     redis,
-    user: User | None,
+    user: User | None = None,
 ):
     message = _get_message(event)
 
@@ -65,7 +65,7 @@ async def show_stats(
 async def show_achievements(
     event: Message | CallbackQuery,
     db: AsyncSession,
-    user: User | None,
+    user: User | None = None,
 ):
     message = _get_message(event)
 

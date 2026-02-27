@@ -50,7 +50,7 @@ async def start_game(
     state: FSMContext,
     db: AsyncSession,
     redis,
-    user: User | None,
+    user: User | None = None,
 ):
     if not user:
         await message.answer("❌ Используйте /start")
@@ -167,7 +167,7 @@ async def process_guess(
     state: FSMContext,
     db: AsyncSession,
     redis,
-    user: User | None,
+    user: User | None = None,
 ):
     if not user:
         await message.answer("❌ Используйте /start")
@@ -277,7 +277,7 @@ async def use_hint(
     state: FSMContext,
     db: AsyncSession,
     redis,
-    user: User | None,
+    user: User | None = None,
 ):
     if not user:
         await callback.answer("❌ Пользователь не найден", show_alert=True)
@@ -330,7 +330,7 @@ async def surrender_game(
     callback: CallbackQuery,
     state: FSMContext,
     db: AsyncSession,
-    user: User | None,
+    user: User | None = None,
 ):
     data = await state.get_data()
     session_id = data.get("session_id")

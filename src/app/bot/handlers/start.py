@@ -42,7 +42,7 @@ async def cmd_reset_day(
     message: Message,
     db: AsyncSession,
     redis,
-    user: User | None,
+    user: User | None = None,
 ):
     """Dev-команда: полный сброс дня. Только для админов."""
     if message.from_user is None:
@@ -89,7 +89,7 @@ async def cmd_start(
     message: Message,
     state: FSMContext,
     db: AsyncSession,
-    user: User | None,
+    user: User | None = None,
 ):
     """
     /start — единственный хендлер, который создаёт пользователя.
@@ -151,7 +151,7 @@ async def show_daily_hint(
     message: Message,
     db: AsyncSession,
     redis,
-    user: User | None,
+    user: User | None = None,
 ):
     if not user:
         await message.answer("❌ Используйте /start")
@@ -161,7 +161,6 @@ async def show_daily_hint(
     result = await hint_service.show_hint(user.id, hint_type="daily")
 
     # show_hint возвращает {"success": True, "text": ...} или {"success": False, "message": ...}
-    # text = result.get("text") if result["success"] else result.get("message", "❌ Ошибка")
     text = result.get("text") or result.get("message") or "❌ Ошибка"
     await message.answer(text, reply_markup=get_main_menu_keyboard())
 
@@ -171,7 +170,7 @@ async def show_energy(
     message: Message,
     db: AsyncSession,
     redis,
-    user: User | None,
+    user: User | None = None,
 ):
     if not user:
         await message.answer("❌ Пользователь не найден. Используйте /start")
@@ -195,7 +194,7 @@ async def cmd_cancel_game(
     message: Message,
     state: FSMContext,
     db: AsyncSession,
-    user: User | None,
+    user: User | None = None,
 ):
     """Отменить зависшую активную игру."""
     if not user:
