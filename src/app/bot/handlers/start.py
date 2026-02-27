@@ -48,7 +48,7 @@ async def cmd_reset_day(
     if message.from_user is None:
         return
     if message.from_user.id not in settings.admin_ids:
-        await message.answer("❌ У вас нет доступа к этой команде")
+        # await message.answer("❌ У вас нет доступа к этой команде")
         return
 
     if not user:
