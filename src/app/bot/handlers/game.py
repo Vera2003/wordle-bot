@@ -129,9 +129,7 @@ async def start_game(
             f"Попыток использовано: {existing_game.attempts}/{existing_game.max_attempts}\n"
             f"Энергия: {current_energy}⚡\n\n"
             f"Введите ваш вариант:",
-            reply_markup=get_game_keyboard(
-                has_energy=current_energy > 0, can_use_hint=can_use_hint
-            ),
+            reply_markup=get_game_keyboard(),
         )
     else:
         logger.info("🆕 Creating new game", gene_id=gene.id, gene_name=gene.name)
@@ -151,9 +149,7 @@ async def start_game(
                 attempts=session.max_attempts,
                 energy=current_energy,
             ),
-            reply_markup=get_game_keyboard(
-                has_energy=current_energy > 0, can_use_hint=can_use_hint
-            ),
+            reply_markup=get_game_keyboard(),
         )
 
 
@@ -262,9 +258,7 @@ async def process_guess(
                     attempts_left=result.attempts_left,
                     energy=current_energy,
                 ),
-                reply_markup=get_game_keyboard(
-                    has_energy=current_energy > 0, can_use_hint=can_use_hint
-                ),
+                reply_markup=get_game_keyboard(),
             )
 
     except ValueError as e:

@@ -27,16 +27,16 @@ def get_main_menu_keyboard() -> ReplyKeyboardMarkup:
     return builder.as_markup(resize_keyboard=True)
 
 
-def get_game_keyboard(has_energy: bool = True, can_use_hint: bool = True) -> InlineKeyboardMarkup:
+def get_game_keyboard() -> InlineKeyboardMarkup:
     builder = InlineKeyboardBuilder()
     
-    if can_use_hint and has_energy:
-        builder.row(
-            InlineKeyboardButton(
-                text="💡 Использовать подсказку (2⚡)", 
-                callback_data="game:use_hint"
-            )
-        )
+    # if can_use_hint and has_energy:
+    #     builder.row(
+    #         InlineKeyboardButton(
+    #             text="💡 Использовать подсказку (2⚡)", 
+    #             callback_data="game:use_hint"
+    #         )
+    #     )
     
     builder.row(
         InlineKeyboardButton(text="❌ Сдаться", callback_data="game:surrender")
