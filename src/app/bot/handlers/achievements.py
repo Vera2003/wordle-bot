@@ -18,9 +18,10 @@ from ...services.game_service import GameService
 router = Router()
 
 
-def _get_message(event: Message | CallbackQuery) -> Message:
-    """Извлекает объект Message независимо от типа события."""
-    return event.message if isinstance(event, CallbackQuery) else event
+def _get_message(event: Message | CallbackQuery) -> Message | None:
+    if isinstance(event, CallbackQuery):
+        return event.message if isinstance(event.message, Message) else None
+    return event
 
 
 @router.message(F.text == "📊 Статистика")
@@ -32,7 +33,9 @@ async def show_stats(
     user: User | None = None,
 ):
     message = _get_message(event)
-
+    if not message:
+        return
+    
     if not user:
         await message.answer("❌ Используйте /start")
         return
@@ -54,10 +57,14 @@ async def show_stats(
     )
 
     if isinstance(event, CallbackQuery):
-        await event.message.edit_text(text, reply_markup=get_main_menu_keyboard())
+        message = _get_message(event)
+        if not message:
+            await event.answer()
+            return
+        await message.answer(text, reply_markup=get_main_menu_keyboard())  # answer, не edit_text
         await event.answer()
     else:
-        await message.answer(text, reply_markup=get_main_menu_keyboard())
+        await event.answer(text, reply_markup=get_main_menu_keyboard())
 
 
 @router.message(F.text == "🏆 Мои достижения")
@@ -68,7 +75,8 @@ async def show_achievements(
     user: User | None = None,
 ):
     message = _get_message(event)
-
+    if not message:
+        return
     if not user:
         await message.answer("❌ Используйте /start")
         return
@@ -80,7 +88,11 @@ async def show_achievements(
     )
 
     if isinstance(event, CallbackQuery):
-        await event.message.edit_text(text, reply_markup=get_main_menu_keyboard())
+        message = _get_message(event)
+        if not message:
+            await event.answer()
+            return
+        await message.answer(text, reply_markup=get_main_menu_keyboard())  # answer, не edit_text
         await event.answer()
     else:
-        await message.answer(text, reply_markup=get_main_menu_keyboard())
+        await event.answer(text, reply_markup=get_main_menu_keyboard())

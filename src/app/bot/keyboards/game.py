@@ -1,6 +1,6 @@
 from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton, ReplyKeyboardMarkup, KeyboardButton
 
-from ..keyboards.menu import get_game_keyboard
+# from ..keyboards.menu import get_game_keyboard
 
 # def get_game_keyboard(can_use_hint: bool = True) -> InlineKeyboardMarkup:
 #     """Клавиатура для игрового процесса"""

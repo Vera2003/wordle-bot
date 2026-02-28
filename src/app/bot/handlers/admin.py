@@ -222,6 +222,9 @@ async def list_genes_for_edit(message: Message, state: FSMContext, db: AsyncSess
 
 @router.callback_query(F.data.startswith("admin:edit_gene:"))
 async def show_gene_edit_menu(callback: CallbackQuery, db: AsyncSession):
+    if not callback.data:
+        await callback.answer("Неверные данные", show_alert=True)
+        return
     gene_id = int(callback.data.split(":")[-1])
     gene = await db.get(Gene, gene_id)
     if not gene:
@@ -276,6 +279,9 @@ async def back_to_genes(callback: CallbackQuery, db: AsyncSession):
 
 @router.callback_query(F.data.startswith("admin:gene_toggle:"))
 async def toggle_gene_active(callback: CallbackQuery, db: AsyncSession):
+    if not callback.data:
+        await callback.answer("Неверные данные", show_alert=True)
+        return
     gene_id = int(callback.data.split(":")[-1])
     gene = await db.get(Gene, gene_id)
     if not gene:
@@ -295,6 +301,9 @@ async def toggle_gene_active(callback: CallbackQuery, db: AsyncSession):
 @router.callback_query(F.data.startswith("admin:gene_field:"))
 async def start_edit_gene_field(callback: CallbackQuery, state: FSMContext, db: AsyncSession):
     """Начать редактирование конкретного поля гена."""
+    if not callback.data:
+        await callback.answer("Неверные данные", show_alert=True)
+        return
     parts = callback.data.split(":")  # admin:gene_field:FIELD:GENE_ID
     field = parts[2]
     gene_id = int(parts[3])
@@ -338,8 +347,13 @@ async def process_edit_gene_field(message: Message, state: FSMContext, db: Async
         return
 
     data = await state.get_data()
-    gene_id = data.get("edit_gene_id")
-    field = data.get("edit_field")
+    gene_id: int | None = data.get("edit_gene_id")
+    field: str | None = data.get("edit_field")
+
+    if not gene_id or not field:
+        await message.answer("❌ Данные сессии потеряны")
+        await state.set_state(AdminStates.admin_menu)
+        return
 
     gene = await db.get(Gene, gene_id)
     if not gene:
@@ -411,6 +425,9 @@ async def show_prizes(message: Message, state: FSMContext, db: AsyncSession):
 
 @router.callback_query(F.data.startswith("admin:prize:"))
 async def show_prize_detail(callback: CallbackQuery, db: AsyncSession):
+    if not callback.data:
+        await callback.answer("Неверные данные", show_alert=True)
+        return
     prize_id = int(callback.data.split(":")[-1])
     prize = await db.get(PrizeType, prize_id)
     if not prize:
@@ -464,6 +481,9 @@ async def back_to_prizes(callback: CallbackQuery, db: AsyncSession):
 
 @router.callback_query(F.data.startswith("admin:prize_toggle:"))
 async def toggle_prize_active(callback: CallbackQuery, db: AsyncSession):
+    if not callback.data:
+        await callback.answer("Неверные данные", show_alert=True)
+        return
     prize_id = int(callback.data.split(":")[-1])
     prize = await db.get(PrizeType, prize_id)
     if not prize:
@@ -481,6 +501,9 @@ async def toggle_prize_active(callback: CallbackQuery, db: AsyncSession):
 
 @router.callback_query(F.data.startswith("admin:prize_field:"))
 async def start_edit_prize_field(callback: CallbackQuery, state: FSMContext, db: AsyncSession):
+    if not callback.data:
+        await callback.answer("Неверные данные", show_alert=True)
+        return
     parts = callback.data.split(":")  # admin:prize_field:FIELD:PRIZE_ID
     field = parts[2]
     prize_id = int(parts[3])
@@ -524,7 +547,12 @@ async def process_edit_prize_field(message: Message, state: FSMContext, db: Asyn
 
     data = await state.get_data()
     prize_id = data.get("edit_prize_id")
-    field = data.get("edit_field")
+    field: str | None = data.get("edit_field")
+    
+    if not field:
+        await message.answer("❌ Поле не определено")
+        await state.set_state(AdminStates.admin_menu)
+        return
 
     prize = await db.get(PrizeType, prize_id)
     if not prize:

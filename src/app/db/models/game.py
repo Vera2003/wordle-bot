@@ -1,11 +1,15 @@
 from datetime import datetime
+
 from sqlalchemy import Column, Integer, BigInteger, String, DateTime, ForeignKey, Boolean, Text, func, JSON
 from sqlalchemy.orm import Mapped, mapped_column, relationship
-from typing import List
+from typing import TYPE_CHECKING, List
 
 from ..base import Base
 
-
+if TYPE_CHECKING:
+    from .user import User
+    from .gene import Gene
+    
 class GameSession(Base):
     """Игровая сессия"""
     

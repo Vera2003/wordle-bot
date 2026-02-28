@@ -1,4 +1,4 @@
-from typing import List, Dict, Optional
+from typing import List, Dict, Optional, cast, Literal
 from datetime import datetime, timezone
 import random
 
@@ -33,7 +33,7 @@ class GameService:
         target = target.upper()
         guess = guess.upper()
         result = []
-        target_chars = list(target)
+        target_chars: List[Optional[str]] = list(target)
         
         # Первый проход - отмечаем правильные позиции
         for i, char in enumerate(guess):
@@ -193,10 +193,18 @@ class GameService:
         await self.db.commit()
         await self.db.refresh(session)
         
+        letter_statuses = [
+            LetterStatus(
+                letter=item["letter"],
+                status=cast(Literal["correct", "present", "absent"], item["status"]),
+            )
+            for item in check_result
+        ]
+        
         return AttemptResult(
             attempt_number=session.attempts,
             guess=guess,
-            result=check_result,
+            result=letter_statuses,
             is_correct=is_correct,
             is_game_over=session.is_finished,
             is_won=session.is_won,
@@ -211,14 +219,18 @@ class GameService:
             GameSession.user_id == user_id,
             GameSession.is_finished == True
         )
-        total_games = await self.db.scalar(total_games_query)
+        total_games: int = (
+            await self.db.scalar(total_games_query)
+        ) or 0
         
         # Выигранных игр
         won_games_query = select(func.count(GameSession.id)).where(
             GameSession.user_id == user_id,
             GameSession.is_won == True
         )
-        won_games = await self.db.scalar(won_games_query)
+        won_games: int = (
+            await self.db.scalar(won_games_query)
+        ) or 0
         
         # Получаем пользователя
         user_query = select(User).where(User.id == user_id)

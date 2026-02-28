@@ -11,6 +11,8 @@
 import asyncio
 import sys
 from pathlib import Path
+from typing import TypedDict
+
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine
 
@@ -25,11 +27,40 @@ from src.app.db.models.gene import Gene
 from src.app.db.models.prize import PrizeType, UserPrize  # noqa: F401
 from src.app.db.models.user import User  # noqa: F401
 
+
+# ============================================================================
+# TypedDict для каждого типа данных
+# ============================================================================
+
+class GeneData(TypedDict):
+    name: str
+    description: str
+    hint: str
+    difficulty: str
+
+
+class AchievementTypeData(TypedDict):
+    name: str
+    title: str
+    description: str
+    requirement: int
+    reward_type: str
+    reward_value: str
+
+
+class PrizeTypeData(TypedDict):
+    name: str
+    title: str
+    description: str
+    prize_value: str
+    is_active: bool
+
+
 # ============================================================================
 # ГЕНЫ (15 штук из ТЗ)
 # ============================================================================
 
-GENES_DATA = [
+GENES_DATA: list[GeneData] = [
     {
         "name": "TCF7L2",
         "description": "Ген, связанный с риском развития диабета 2 типа. Влияет на выработку инсулина и регуляцию уровня глюкозы в крови. Один из главных генетических факторов развития сахарного диабета.",
@@ -122,34 +153,36 @@ GENES_DATA = [
     },
 ]
 
+
 # ============================================================================
 # ДОСТИЖЕНИЯ
 # ============================================================================
 
-ACHIEVEMENT_TYPES = [
-    {"name": "silver", "title": "🥈 Серебро", "description": "Выиграйте 5 игр", "requirement": 5, "reward_type": "discount", "reward_value": "10"},
-    {"name": "gold", "title": "🥇 Золото", "description": "Выиграйте 10 игр", "requirement": 10, "reward_type": "fast_delivery", "reward_value": "true"},
-    {"name": "platinum", "title": "💎 Платина", "description": "Выиграйте 20 игр", "requirement": 20, "reward_type": "consultation", "reward_value": "true"},
-    {"name": "perfect_game", "title": "🎯 Идеальная игра", "description": "Угадайте ген с первой попытки", "requirement": 1, "reward_type": "bonus_energy", "reward_value": "5"},
-    {"name": "streak_3", "title": "🔥 Серия из 3", "description": "Выиграйте 3 игры подряд", "requirement": 3, "reward_type": "bonus_energy", "reward_value": "3"},
-    {"name": "night_owl", "title": "🦉 Ночная сова", "description": "Играйте после полуночи", "requirement": 1, "reward_type": "bonus_energy", "reward_value": "2"},
-    {"name": "speedrunner", "title": "⚡ Спидраннер", "description": "Завершите игру за 60 секунд", "requirement": 1, "reward_type": "bonus_energy", "reward_value": "3"},
-    {"name": "gene_master", "title": "🧬 Мастер генов", "description": "Угадайте все 15 генов хотя бы раз", "requirement": 15, "reward_type": "special_prize", "reward_value": "certificate"},
+ACHIEVEMENT_TYPES: list[AchievementTypeData] = [
+    {"name": "silver",       "title": "🥈 Серебро",        "description": "Выиграйте 5 игр",                    "requirement": 5,  "reward_type": "discount",      "reward_value": "10"},
+    {"name": "gold",         "title": "🥇 Золото",          "description": "Выиграйте 10 игр",                   "requirement": 10, "reward_type": "fast_delivery", "reward_value": "true"},
+    {"name": "platinum",     "title": "💎 Платина",         "description": "Выиграйте 20 игр",                   "requirement": 20, "reward_type": "consultation",  "reward_value": "true"},
+    {"name": "perfect_game", "title": "🎯 Идеальная игра",  "description": "Угадайте ген с первой попытки",      "requirement": 1,  "reward_type": "bonus_energy",  "reward_value": "5"},
+    {"name": "streak_3",     "title": "🔥 Серия из 3",      "description": "Выиграйте 3 игры подряд",            "requirement": 3,  "reward_type": "bonus_energy",  "reward_value": "3"},
+    {"name": "night_owl",    "title": "🦉 Ночная сова",     "description": "Играйте после полуночи",             "requirement": 1,  "reward_type": "bonus_energy",  "reward_value": "2"},
+    {"name": "speedrunner",  "title": "⚡ Спидраннер",      "description": "Завершите игру за 60 секунд",        "requirement": 1,  "reward_type": "bonus_energy",  "reward_value": "3"},
+    {"name": "gene_master",  "title": "🧬 Мастер генов",    "description": "Угадайте все 15 генов хотя бы раз", "requirement": 15, "reward_type": "special_prize", "reward_value": "certificate"},
 ]
+
 
 # ============================================================================
 # ПРИЗЫ
 # ============================================================================
 
-PRIZE_TYPES = [
-    {"name": "discount_10", "title": "Скидка 10%", "description": "Скидка 10% на следующий заказ MyExpert", "prize_value": "GENE10", "is_active": True},
-    {"name": "discount_15", "title": "Скидка 15%", "description": "Скидка 15% на следующий заказ MyExpert", "prize_value": "GENE15", "is_active": True},
-    {"name": "discount_20", "title": "Скидка 20%", "description": "Скидка 20% на следующий заказ MyExpert", "prize_value": "GENE20", "is_active": True},
-    {"name": "free_delivery", "title": "Бесплатная доставка", "description": "Ускоренная доставка бесплатно", "prize_value": "EXPRESS_FREE", "is_active": True},
-    {"name": "consultation", "title": "Бонусная консультация", "description": "Бесплатная консультация генетика", "prize_value": "CONSULT_FREE", "is_active": True},
-    {"name": "gift_card_500", "title": "Подарочная карта 500₽", "description": "Подарочная карта на 500 рублей", "prize_value": "GIFT500", "is_active": True},
-    {"name": "gift_card_1000", "title": "Подарочная карта 1000₽", "description": "Подарочная карта на 1000 рублей", "prize_value": "GIFT1000", "is_active": True},
-    {"name": "certificate", "title": "Сертификат мастера генов", "description": "Именной сертификат 'Мастер генетики'", "prize_value": "MASTER_CERT", "is_active": True},
+PRIZE_TYPES: list[PrizeTypeData] = [
+    {"name": "discount_10",   "title": "Скидка 10%",              "description": "Скидка 10% на следующий заказ MyExpert",  "prize_value": "GENE10",       "is_active": True},
+    {"name": "discount_15",   "title": "Скидка 15%",              "description": "Скидка 15% на следующий заказ MyExpert",  "prize_value": "GENE15",       "is_active": True},
+    {"name": "discount_20",   "title": "Скидка 20%",              "description": "Скидка 20% на следующий заказ MyExpert",  "prize_value": "GENE20",       "is_active": True},
+    {"name": "free_delivery", "title": "Бесплатная доставка",     "description": "Ускоренная доставка бесплатно",           "prize_value": "EXPRESS_FREE", "is_active": True},
+    {"name": "consultation",  "title": "Бонусная консультация",   "description": "Бесплатная консультация генетика",        "prize_value": "CONSULT_FREE", "is_active": True},
+    {"name": "gift_card_500", "title": "Подарочная карта 500₽",   "description": "Подарочная карта на 500 рублей",          "prize_value": "GIFT500",      "is_active": True},
+    {"name": "gift_card_1000","title": "Подарочная карта 1000₽",  "description": "Подарочная карта на 1000 рублей",         "prize_value": "GIFT1000",     "is_active": True},
+    {"name": "certificate",   "title": "Сертификат мастера генов","description": "Именной сертификат 'Мастер генетики'",    "prize_value": "MASTER_CERT",  "is_active": True},
 ]
 
 
@@ -178,38 +211,40 @@ async def init_database() -> bool:
             # Гены
             print("\n🧬 Гены:")
             genes_added = 0
-            for item in GENES_DATA:
-                exists = await session.scalar(select(Gene).where(Gene.name == item["name"]))
+            for gene in GENES_DATA:
+                exists = await session.scalar(select(Gene).where(Gene.name == gene["name"]))
                 if not exists:
-                    session.add(Gene(**item, is_active=True))
+                    session.add(Gene(**gene, is_active=True))
                     genes_added += 1
-                    print(f"   ✓ {item['name']:8} [{item['difficulty']}]")
+                    print(f"   ✓ {gene['name']:8} [{gene['difficulty']}]")
             await session.commit()
             print(f"   Итого: {genes_added}/{len(GENES_DATA)}")
 
             # Достижения
             print("\n🏆 Достижения:")
             ach_added = 0
-            for item in ACHIEVEMENT_TYPES:
-                from src.app.db.models.achievements import AchievementType
-                exists = await session.scalar(select(AchievementType).where(AchievementType.name == item["name"]))
+            for ach in ACHIEVEMENT_TYPES:
+                exists = await session.scalar(
+                    select(AchievementType).where(AchievementType.name == ach["name"])
+                )
                 if not exists:
-                    session.add(AchievementType(**item))
+                    session.add(AchievementType(**ach))
                     ach_added += 1
-                    print(f"   ✓ {item['title']}")
+                    print(f"   ✓ {ach['title']}")
             await session.commit()
             print(f"   Итого: {ach_added}/{len(ACHIEVEMENT_TYPES)}")
 
             # Призы
             print("\n🎁 Призы:")
             prizes_added = 0
-            for item in PRIZE_TYPES:
-                from src.app.db.models.prize import PrizeType
-                exists = await session.scalar(select(PrizeType).where(PrizeType.name == item["name"]))
+            for prize in PRIZE_TYPES:
+                exists = await session.scalar(
+                    select(PrizeType).where(PrizeType.name == prize["name"])
+                )
                 if not exists:
-                    session.add(PrizeType(**item))
+                    session.add(PrizeType(**prize))
                     prizes_added += 1
-                    print(f"   ✓ {item['title']}")
+                    print(f"   ✓ {prize['title']}")
             await session.commit()
             print(f"   Итого: {prizes_added}/{len(PRIZE_TYPES)}")
 
