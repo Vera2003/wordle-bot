@@ -9,7 +9,7 @@
 - Все импорты на уровне модуля, не внутри функций
 - Добавлен /help как алиас для правил
 """
-from datetime import datetime
+from datetime import datetime, timezone
 
 import structlog
 from aiogram import F, Router
@@ -211,7 +211,7 @@ async def cmd_cancel_game(
 
     if active_game:
         active_game.is_finished = True
-        active_game.finished_at = datetime.utcnow()
+        active_game.finished_at = datetime.now(timezone.utc).replace(tzinfo=None)
         await db.commit()
         await state.clear()
         await message.answer(

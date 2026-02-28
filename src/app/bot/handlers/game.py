@@ -2,7 +2,7 @@
 Хендлеры игрового процесса.
 """
 import re
-from datetime import datetime
+from datetime import datetime, timezone
 
 import structlog
 from aiogram import F, Router
@@ -74,7 +74,7 @@ async def start_game(
     for game in stale_games:
         if game.started_at.date() != today:
             game.is_finished = True
-            game.finished_at = datetime.utcnow()
+            game.finished_at = datetime.now(timezone.utc).replace(tzinfo=None)
             logger.info("🗑️ Closed stale game", game_id=game.id)
     if stale_games:
         await db.commit()
@@ -338,7 +338,7 @@ async def surrender_game(
         return
 
     session.is_finished = True
-    session.finished_at = datetime.utcnow()
+    session.finished_at = datetime.now(timezone.utc).replace(tzinfo=None)
     await db.commit()
     await db.refresh(session, ["gene"])
 

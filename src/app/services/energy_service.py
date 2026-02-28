@@ -6,7 +6,7 @@
 - Добавлен _cache_key() метод — ключ Redis в одном месте
 - add_energy больше не вложен внутрь spend_energy (исходный критический баг)
 """
-from datetime import datetime, time
+from datetime import datetime, time, timezone
 
 import redis.asyncio as aioredis
 from sqlalchemy import select
@@ -75,13 +75,13 @@ class EnergyService:
             return
 
         user.energy = settings.daily_energy
-        user.last_energy_reset = datetime.utcnow()
+        user.last_energy_reset = datetime.now(timezone.utc).replace(tzinfo=None)
         await self.db.commit()
         await self.redis.set(self._cache_key(user_id), user.energy, ex=_ENERGY_CACHE_TTL)
 
     async def _check_and_restore_energy(self, user: User) -> None:
         """Авто-восстановление если прошли сутки (UTC)."""
-        now = datetime.utcnow()
+        now = datetime.now(timezone.utc).replace(tzinfo=None)
         midnight_today = datetime.combine(now.date(), time(0, 0))
         if user.last_energy_reset < midnight_today:
             user.energy = settings.daily_energy

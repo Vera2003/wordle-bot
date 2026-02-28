@@ -1,5 +1,5 @@
 from typing import List, Dict, Optional
-from datetime import datetime, timedelta
+from datetime import datetime, timezone
 import random
 
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -173,7 +173,7 @@ class GameService:
         if is_correct:
             session.is_won = True
             session.is_finished = True
-            session.finished_at = datetime.utcnow()
+            session.finished_at = datetime.now(timezone.utc).replace(tzinfo=None)
             
             # Начисляем очки (больше за меньшее кол-во попыток)
             points = max(10, 60 - (session.attempts * 10))
@@ -188,7 +188,7 @@ class GameService:
         # Проверяем проигрыш
         elif session.attempts >= session.max_attempts:
             session.is_finished = True
-            session.finished_at = datetime.utcnow()
+            session.finished_at = datetime.now(timezone.utc).replace(tzinfo=None)
         
         await self.db.commit()
         await self.db.refresh(session)
