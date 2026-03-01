@@ -1,6 +1,7 @@
 from pydantic import Field, field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
+from functools import lru_cache
 
 class Settings(BaseSettings):
     """Настройки приложения"""
@@ -76,4 +77,8 @@ class Settings(BaseSettings):
         return v.rstrip("/") if v else ""
 
 
-settings = Settings()
+@lru_cache(maxsize=1)
+def get_settings() -> Settings:
+    return Settings()
+
+settings = get_settings()

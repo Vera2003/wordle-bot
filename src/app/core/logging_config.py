@@ -1,19 +1,13 @@
-"""
-Настройка structlog + стандартного logging.
-
-ИСПРАВЛЕН БАГ: structlog не имеет метода .getLogger() — это метод стандартного
-logging. Ошибка вызывала AttributeError при старте.
-"""
 import logging
 import sys
+from typing import Any, MutableMapping
 
 import structlog
+from structlog.types import Processor
 
 
 def setup_logging() -> None:
-    """Настройка structlog с выводом в консоль."""
-
-    shared_processors = [
+    shared_processors: list[Processor] = [
         structlog.contextvars.merge_contextvars,
         structlog.stdlib.add_logger_name,
         structlog.stdlib.add_log_level,
@@ -47,7 +41,6 @@ def setup_logging() -> None:
     root_logger.addHandler(handler)
     root_logger.setLevel(logging.INFO)
 
-    # ИСПРАВЛЕНО: logging.getLogger(), не structlog.getLogger()
     logging.getLogger("aiogram").setLevel(logging.INFO)
     logging.getLogger("httpx").setLevel(logging.WARNING)
     logging.getLogger("httpcore").setLevel(logging.WARNING)
