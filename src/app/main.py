@@ -16,7 +16,7 @@ from aiogram.fsm.storage.redis import RedisStorage
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from prometheus_fastapi_instrumentator import Instrumentator
-from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine
+from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 
 from .api.v1 import genes, prizes, stats
 from .bot.handlers import achievements, admin, game, start
@@ -26,7 +26,6 @@ from .bot.middleware.user import UserMiddleware
 from .bot.webhook import WebhookHandler, remove_webhook, setup_webhook
 from .core.config import settings
 from .core.logging_config import setup_logging
-from .db.session import engine
 
 # Импортируем все модели, чтобы Alembic их видел
 from .db.models.achievements import AchievementType, UserAchievement  # noqa: F401
@@ -49,7 +48,21 @@ class AppState:
 async def lifespan(app: FastAPI):
     state = AppState()
     app.state.app_state = state  # храним в app.state
-
+    
+    # Явная инициализация — один раз, в одном месте, без глобалов
+    app.state.db_engine = create_async_engine(
+        settings.database_url,
+        echo=False,
+        pool_pre_ping=True,
+        pool_size=10,
+        max_overflow=20,
+    )
+    app.state.db_session_maker = async_sessionmaker(
+        app.state.db_engine,
+        class_=AsyncSession,
+        expire_on_commit=False,
+    )
+        
     logger.info("🚀 FastAPI starting up")
 
     if settings.use_webhook:
@@ -99,7 +112,8 @@ async def lifespan(app: FastAPI):
     if state.bot:
         await remove_webhook(state.bot)
         await state.bot.session.close()
-    await engine.dispose()
+        
+    await app.state.db_engine.dispose()
 
 
 app = FastAPI(
