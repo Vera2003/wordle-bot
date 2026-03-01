@@ -3,7 +3,9 @@
 
 Для polling-режима (разработка) используйте: python -m src.app.bot_polling
 """
+
 from contextlib import asynccontextmanager
+from dataclasses import dataclass, field
 
 import redis.asyncio as aioredis
 import structlog
@@ -36,14 +38,17 @@ from .db.models.user import User  # noqa: F401
 setup_logging()
 logger = structlog.get_logger(__name__)
 
-bot: Bot | None = None
-dp: Dispatcher | None = None
-webhook_handler: WebhookHandler | None = None
+@dataclass
+class AppState:
+    bot: Bot | None = None
+    dp: Dispatcher | None = None
+    webhook_handler: WebhookHandler | None = None
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    global bot, dp, webhook_handler
+    state = AppState()
+    app.state.app_state = state  # храним в app.state
 
     logger.info("🚀 FastAPI starting up")
 
@@ -51,7 +56,7 @@ async def lifespan(app: FastAPI):
         if not settings.webhook_domain:
             raise ValueError("WEBHOOK_DOMAIN не установлен в .env!")
 
-        bot = Bot(
+        state.bot = Bot(
             token=settings.bot_token,
             default=DefaultBotProperties(parse_mode=ParseMode.HTML),
         )
@@ -60,26 +65,26 @@ async def lifespan(app: FastAPI):
             settings.redis_url, encoding="utf-8", decode_responses=True
         )
         storage = RedisStorage(redis_client)
-        dp = Dispatcher(storage=storage)
+        state.dp = Dispatcher(storage=storage)
 
         engine_bot = create_async_engine(settings.database_url, echo=False)
         sessionmaker = async_sessionmaker(engine_bot, expire_on_commit=False)
 
         # Порядок middleware важен: Logging → DbSession → User
-        dp.update.middleware(LoggingMiddleware())
-        dp.update.middleware(DbSessionMiddleware(sessionmaker, redis_client))
-        dp.update.middleware(UserMiddleware())
+        state.dp.update.middleware(LoggingMiddleware())
+        state.dp.update.middleware(DbSessionMiddleware(sessionmaker, redis_client))
+        state.dp.update.middleware(UserMiddleware())
 
-        dp.include_router(start.router)
-        dp.include_router(game.router)
-        dp.include_router(achievements.router)
-        dp.include_router(admin.router)
+        state.dp.include_router(start.router)
+        state.dp.include_router(game.router)
+        state.dp.include_router(achievements.router)
+        state.dp.include_router(admin.router)
 
-        webhook_handler = WebhookHandler(
-            bot=bot, dp=dp, secret_token=settings.webhook_secret
+        state.webhook_handler = WebhookHandler(
+            bot=state.bot, dp=state.dp, secret_token=settings.webhook_secret
         )
         await setup_webhook(
-            bot=bot,
+            bot=state.bot,
             webhook_url=settings.webhook_url,
             secret_token=settings.webhook_secret,
         )
@@ -90,9 +95,10 @@ async def lifespan(app: FastAPI):
     yield
 
     logger.info("👋 FastAPI shutting down")
-    if bot:
-        await remove_webhook(bot)
-        await bot.session.close()
+    
+    if state.bot:
+        await remove_webhook(state.bot)
+        await state.bot.session.close()
     await engine.dispose()
 
 
@@ -116,8 +122,9 @@ Instrumentator().instrument(app).expose(app)
 if settings.use_webhook:
     @app.post(settings.webhook_path)
     async def telegram_webhook(request: Request):
-        if webhook_handler:
-            return await webhook_handler.handle(request)
+        state: AppState = request.app.state.app_state
+        if state.webhook_handler:
+            return await state.webhook_handler.handle(request)
         return {"status": "webhook not initialized"}
 
 app.include_router(genes.router, prefix="/api/v1/genes", tags=["Genes"])
@@ -142,9 +149,10 @@ async def health():
 
 
 @app.get("/webhook/status")
-async def webhook_status():
-    if bot:
-        info = await bot.get_webhook_info()
+async def webhook_status(request: Request) -> dict:
+    state: AppState = request.app.state.app_state
+    if state.bot:
+        info = await state.bot.get_webhook_info()
         return {
             "url": info.url,
             "pending_update_count": info.pending_update_count,
