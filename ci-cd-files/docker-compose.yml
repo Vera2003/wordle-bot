@@ -2,6 +2,7 @@ x-app-env: &app-env
   ENVIRONMENT: ${ENVIRONMENT:-production}
   BOT_TOKEN: ${BOT_TOKEN}
   ADMIN_IDS: ${ADMIN_IDS:-[]}
+  ADMIN_API_KEY: ${ADMIN_API_KEY}
   
   # Webhook
   USE_WEBHOOK: ${USE_WEBHOOK:-false}

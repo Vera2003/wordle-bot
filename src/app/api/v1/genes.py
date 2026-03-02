@@ -7,7 +7,9 @@ from ...db.session import get_db
 from ...db.models.gene import Gene
 from ...schemas.gene import GeneCreate, GeneUpdate, GeneResponse
 
-router = APIRouter()
+from ...core.security import require_admin_api_key
+
+router = APIRouter(dependencies=[Depends(require_admin_api_key)])
 
 
 @router.get("/", response_model=List[GeneResponse])

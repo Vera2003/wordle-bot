@@ -16,6 +16,7 @@ class Settings(BaseSettings):
     # Telegram Bot
     bot_token: str = Field(..., description="Telegram Bot Token")
     admin_ids: list[int] = Field(default_factory=list)
+    admin_api_key: str = Field(..., description="Secret key for REST admin API")
     
     # Webhook
     use_webhook: bool = Field(default=False)

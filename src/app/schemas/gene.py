@@ -5,7 +5,7 @@ from datetime import datetime
 
 class GeneBase(BaseModel):
     """Базовая схема гена"""
-    name: str = Field(..., min_length=5, max_length=7, description="Название гена")
+    name: str = Field(..., min_length=3, max_length=7, description="Название гена")
     description: str = Field(..., min_length=20, description="Описание гена")
     hint: str = Field(..., min_length=10, description="Подсказка")
     difficulty: str = Field(default="medium", pattern="^(easy|medium|hard)$")
