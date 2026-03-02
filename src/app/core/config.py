@@ -28,6 +28,7 @@ class Settings(BaseSettings):
     environment: str = Field(default="development")
     app_host: str = Field(default="0.0.0.0")
     app_port: int = Field(default=8000)
+    allowed_origins: list[str] = Field(default_factory=list)
     
     # PostgreSQL
     postgres_host: str = Field(default="localhost")
