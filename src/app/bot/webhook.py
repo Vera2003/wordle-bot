@@ -25,7 +25,7 @@ class WebhookHandler:
             
             # Проверка токена
             token = request.headers.get("X-Telegram-Bot-Api-Secret-Token")
-            if token != self.secret_token:
+            if not hmac.compare_digest(token or "", self.secret_token):
                 logger.warning("❌ Invalid secret token", received_token=token)
                 return {"status": "error", "message": "Invalid token"}
 
