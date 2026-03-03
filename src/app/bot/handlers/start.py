@@ -22,7 +22,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from ..keyboards.menu import get_main_menu_keyboard
 from ..states.game import GameStates
 from ..texts.messages import ENERGY_MESSAGE, MAIN_MENU_MESSAGE, RULES_MESSAGE, WELCOME_MESSAGE
-from ...core.config import settings
+from ...core.config import get_settings
 from ...db.models.achievements import UserAchievement
 from ...db.models.game import GameSession
 from ...db.models.prize import UserPrize
@@ -35,7 +35,7 @@ from ...utils.time_helpers import get_today_str
 
 router = Router()
 logger = structlog.get_logger(__name__)
-
+settings = get_settings()
 
 @router.message(Command("resetday"))
 async def cmd_reset_day(

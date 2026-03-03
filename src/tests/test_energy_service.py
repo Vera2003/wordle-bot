@@ -150,7 +150,8 @@ class TestRestoreDailyEnergy:
         await svc.restore_daily_energy(user.id)
 
         await db.refresh(user)
-        from src.app.core.config import settings
+        from src.app.core.config import get_settings
+        settings = get_settings()
         assert user.energy == settings.daily_energy
 
     @pytest.mark.asyncio
@@ -173,6 +174,7 @@ class TestRestoreDailyEnergy:
 
         await svc.restore_daily_energy(user.id)
 
-        from src.app.core.config import settings
+        from src.app.core.config import get_settings
+        settings = get_settings()
         cached = redis._store.get(svc._cache_key(user.id))
         assert cached == str(settings.daily_energy)

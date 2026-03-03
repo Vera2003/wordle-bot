@@ -9,7 +9,7 @@ import sys
 from pathlib import Path
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
-from src.app.core.config import settings
+from src.app.core.config import get_settings
 from src.app.db.base import Base
 
 # Импортируем все модели
@@ -23,6 +23,7 @@ from src.app.db.models.prize import PrizeType, UserPrize
 config = context.config
 
 # Устанавливаем URL базы данных
+settings = get_settings()
 config.set_main_option("sqlalchemy.url", settings.database_url)
 
 # Настраиваем логирование

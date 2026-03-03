@@ -3,11 +3,6 @@
 
 Запуск:  poetry run python -m src.app.bot.main
          task dev
-
-Webhook-режим (production): src/app/main.py (uvicorn)
-
-ИСПРАВЛЕНО: импорты были 'from .bot.handlers' — неверно для файла внутри пакета bot/.
-Правильно: 'from .handlers'.
 """
 import asyncio
 
@@ -17,14 +12,14 @@ from aiogram import Bot, Dispatcher
 from aiogram.client.default import DefaultBotProperties
 from aiogram.enums import ParseMode
 from aiogram.fsm.storage.redis import RedisStorage
-from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine
 
 from .handlers import achievements, admin, game, start
 from .middleware.db import DbSessionMiddleware
 from .middleware.logging import LoggingMiddleware
 from .middleware.user import UserMiddleware
-from ..core.config import settings
+from ..core.config import get_settings
 from ..core.logging_config import setup_logging
+from ..db.engine import create_db_engine, create_session_maker
 
 # Импортируем все модели чтобы SQLAlchemy их видел
 from ..db.models.achievements import AchievementType, UserAchievement  # noqa: F401
@@ -38,6 +33,8 @@ logger = structlog.get_logger(__name__)
 
 
 async def main() -> None:
+    settings = get_settings()
+
     bot = Bot(
         token=settings.bot_token,
         default=DefaultBotProperties(parse_mode=ParseMode.HTML),
@@ -49,12 +46,13 @@ async def main() -> None:
     storage = RedisStorage(redis_client)
     dp = Dispatcher(storage=storage)
 
-    engine = create_async_engine(settings.database_url, echo=False)
-    sessionmaker = async_sessionmaker(engine, expire_on_commit=False)
+    # Те же параметры пула, что и в webhook-режиме — через общую фабрику
+    engine = create_db_engine(settings)
+    session_maker = create_session_maker(engine)
 
     # Порядок middleware важен: Logging → DbSession → User
     dp.update.middleware(LoggingMiddleware())
-    dp.update.middleware(DbSessionMiddleware(sessionmaker, redis_client))
+    dp.update.middleware(DbSessionMiddleware(session_maker, redis_client))
     dp.update.middleware(UserMiddleware())
 
     dp.include_router(start.router)

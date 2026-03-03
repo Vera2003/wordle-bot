@@ -65,7 +65,8 @@ class TestGetOrCreate:
 
     @pytest.mark.asyncio
     async def test_new_user_gets_daily_energy(self, db):
-        from src.app.core.config import settings
+        from src.app.core.config import get_settings
+        settings = get_settings()
         svc = UserService(db)
         user = await svc.get_or_create(telegram_id=777)
 

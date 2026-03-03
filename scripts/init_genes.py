@@ -19,7 +19,7 @@ from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine
 root = Path(__file__).parent.parent
 sys.path.insert(0, str(root))
 
-from src.app.core.config import settings
+from src.app.core.config import get_settings
 from src.app.db.base import Base
 from src.app.db.models.achievements import AchievementType, UserAchievement  # noqa: F401
 from src.app.db.models.game import GameAttempt, GameSession  # noqa: F401
@@ -191,6 +191,8 @@ PRIZE_TYPES: list[PrizeTypeData] = [
 # ============================================================================
 
 async def init_database() -> bool:
+    settings = get_settings()
+    
     print("=" * 70)
     print("🔧 ИНИЦИАЛИЗАЦИЯ БАЗЫ ДАННЫХ")
     print("=" * 70)

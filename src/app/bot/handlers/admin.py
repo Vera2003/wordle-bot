@@ -25,7 +25,7 @@ from ..keyboards.menu import (
     get_main_menu_keyboard,
 )
 from ..states.game import AdminStates
-from ...core.config import settings
+from ...core.config import get_settings
 from ...db.models.gene import Gene
 from ...db.models.prize import PrizeType
 from ...services.stats_service import StatsService
@@ -34,6 +34,7 @@ router = Router()
 
 
 def is_admin(user_id: int) -> bool:
+    settings = get_settings()
     return user_id in settings.admin_ids
 
 

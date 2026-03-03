@@ -29,7 +29,8 @@ class UserService:
         user = await self.get_by_telegram_id(telegram_id)
 
         if not user:
-            from ..core.config import settings
+            from ..core.config import get_settings
+            settings = get_settings()
             user = User(
                 telegram_id=telegram_id,
                 username=username,

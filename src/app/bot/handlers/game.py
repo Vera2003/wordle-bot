@@ -21,7 +21,7 @@ from ..texts.messages import (
     WIN_MESSAGE,
     format_attempt_result,
 )
-from ...core.config import settings
+from ...core.config import get_settings
 from ...db.models.game import GameSession
 from ...db.models.user import User
 from ...services.energy_service import EnergyService
@@ -31,6 +31,7 @@ from ...utils.time_helpers import get_today_date
 
 router = Router()
 logger = structlog.get_logger(__name__)
+settings = get_settings()
 
 # Тексты кнопок главного меню — фильтруем их в игровом состоянии
 MENU_TEXTS = frozenset({

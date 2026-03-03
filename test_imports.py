@@ -22,7 +22,11 @@ except Exception as e:
     print(f"❌ Path: {e}")
 
 try:
-    from src.app.core.config import settings
+    from src.app.core.config import get_settings
+    get_settings.cache_clear()
+    # from pytest import MonkeyPatch
+    # monkeypatch.setenv("POSTGRES_DB", "test_db")
+    settings = get_settings()
     print(f"✅ Config загружен")
     print(f"   BOT_TOKEN: {settings.bot_token[:10]}...")
     print(f"   POSTGRES_DB: {settings.postgres_db}")

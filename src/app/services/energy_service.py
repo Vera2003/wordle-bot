@@ -12,12 +12,12 @@ import redis.asyncio as aioredis
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from ..core.config import settings
+from ..core.config import get_settings
 from ..db.models.user import User
 from ..utils.time_helpers import get_seconds_until_midnight
 
 _ENERGY_CACHE_TTL = 3600  # 1 час
-
+settings = get_settings()
 
 class EnergyService:
     """Управление энергией: чтение, трата, пополнение, авто-восстановление."""
