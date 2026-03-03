@@ -1,6 +1,6 @@
 from logging.config import fileConfig
 from sqlalchemy import engine_from_config, pool
-from alembic import context
+from alembic import context # type: ignore[attr-defined]
 import asyncio
 from sqlalchemy.ext.asyncio import async_engine_from_config
 

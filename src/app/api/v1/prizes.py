@@ -9,13 +9,15 @@ from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from ...schemas.prize import PrizeTypeResponse, UserPrizeResponse
+
 from ...db.models.prize import PrizeType, UserPrize
 from ...db.session import get_db
 
 router = APIRouter()
 
 
-@router.get("/", response_model=List[dict])
+@router.get("/", response_model=List[PrizeTypeResponse])
 async def get_prizes(
     skip: int = 0,
     limit: int = 100,
@@ -55,7 +57,7 @@ async def get_prize(prize_id: int, db: AsyncSession = Depends(get_db)):
     }
 
 
-@router.get("/user/{user_id}", response_model=List[dict])
+@router.get("/user/{user_id}", response_model=List[UserPrizeResponse])
 async def get_user_prizes(user_id: int, db: AsyncSession = Depends(get_db)):
     """Призы конкретного пользователя."""
     result = await db.execute(
