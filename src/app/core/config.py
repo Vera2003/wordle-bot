@@ -1,4 +1,5 @@
 from pydantic import Field, field_validator
+from typing import List, Dict
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 from functools import lru_cache
@@ -14,9 +15,9 @@ class Settings(BaseSettings):
     )
     
     # Telegram Bot
-    bot_token: str = Field(..., description="Telegram Bot Token")
+    bot_token: str = Field(default="", description="Telegram Bot Token")
     admin_ids: list[int] = Field(default_factory=list)
-    admin_api_key: str = Field(..., description="Secret key for REST admin API")
+    admin_api_key: str = Field(default="", description="Secret key for REST admin API")
     
     # Webhook
     use_webhook: bool = Field(default=False)
@@ -28,14 +29,14 @@ class Settings(BaseSettings):
     environment: str = Field(default="development")
     app_host: str = Field(default="0.0.0.0")
     app_port: int = Field(default=8000)
-    allowed_origins: list[str] = Field(default_factory=list)
+    allowed_origins: List[str] = Field(default=[])
     
     # PostgreSQL
     postgres_host: str = Field(default="localhost")
     postgres_port: int = Field(default=5432)
     postgres_db: str = Field(default="genetic_wordle")
     postgres_user: str = Field(default="postgres")
-    postgres_password: str = Field(..., description="PostgreSQL password")
+    postgres_password: str = Field(default="", description="PostgreSQL password")
     
     # Redis
     redis_host: str = Field(default="localhost")
