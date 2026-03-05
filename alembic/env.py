@@ -18,6 +18,7 @@ from src.app.db.models.gene import Gene
 from src.app.db.models.game import GameSession, GameAttempt
 from src.app.db.models.achievements import AchievementType, UserAchievement
 from src.app.db.models.prize import PrizeType, UserPrize
+from src.app.db.models.llm_log import LLMLog
 
 # Конфигурация Alembic
 config = context.config

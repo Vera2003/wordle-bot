@@ -20,6 +20,7 @@ aiohttp = "^3.13.3"
 python-dotenv = "^1.2.1"
 prometheus-fastapi-instrumentator = "^7.1.0"
 structlog = "^24.1.0"
+openai = "^2.24.0"
 
 [tool.poetry.group.dev.dependencies]
 black = "^24.1.1"

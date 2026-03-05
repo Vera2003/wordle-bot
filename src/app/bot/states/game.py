@@ -19,3 +19,8 @@ class AdminStates(StatesGroup):
     editing_gene = State()    # редактирование поля гена
     editing_prize = State()   # редактирование поля приза
     viewing_stats = State()
+    
+class ChatStates(StatesGroup):
+    """Состояния чат-режима с ИИ."""
+
+    chatting = State()

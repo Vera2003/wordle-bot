@@ -16,8 +16,8 @@ from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from prometheus_fastapi_instrumentator import Instrumentator
 
-from .api.v1 import genes, prizes, stats, users
-from .bot.handlers import achievements, admin, game, start
+from .api.v1 import genes, prizes, stats, users, llm
+from .bot.handlers import achievements, admin, game, start, chat
 from .bot.middleware.db import DbSessionMiddleware
 from .bot.middleware.logging import LoggingMiddleware
 from .bot.middleware.user import UserMiddleware
@@ -82,6 +82,7 @@ async def lifespan(app: FastAPI):
         state.dp.include_router(game.router)
         state.dp.include_router(achievements.router)
         state.dp.include_router(admin.router)
+        state.dp.include_router(chat.router)
 
         state.webhook_handler = WebhookHandler(
             bot=state.bot, dp=state.dp, secret_token=settings.webhook_secret
@@ -131,6 +132,7 @@ def create_app() -> FastAPI:
     app.include_router(stats.router, prefix="/api/v1/stats", tags=["Statistics"])
     app.include_router(prizes.router, prefix="/api/v1/prizes", tags=["Prizes"])
     app.include_router(users.router, prefix="/api/v1/users", tags=["Users"])
+    app.include_router(llm.router, prefix="/api/v1/llm", tags=["LLM"])
 
     if settings.use_webhook:
         @app.post(settings.webhook_path)

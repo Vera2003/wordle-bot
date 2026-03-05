@@ -52,6 +52,14 @@ class Settings(BaseSettings):
     energy_per_hint: int = Field(default=2)
     bonus_energy: int = Field(default=3)
 
+    # ProxyAPI (прокси к OpenAI, https://proxyapi.ru)
+    proxyapi_key: str = Field(default="", description="API-ключ от proxyapi.ru")
+    proxyapi_model: str = Field(default="gpt-4o-mini", description="Модель: gpt-4o-mini, gpt-4o, gpt-4-turbo")
+
+    @property
+    def llm_enabled(self) -> bool:
+        return bool(self.proxyapi_key)
+
     @property
     def database_url(self) -> str:
         return (

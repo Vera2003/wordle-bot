@@ -27,13 +27,13 @@ from ...db.models.user import User
 from ...services.energy_service import EnergyService
 from ...services.game_service import GameService
 from ...services.gene_of_day_service import GeneOfDayService
+from ...services.llm_service import LLMService  # ← ДОБАВЛЕНО
 from ...utils.time_helpers import get_today_date
 
 router = Router()
 logger = structlog.get_logger(__name__)
 settings = get_settings()
 
-# Тексты кнопок главного меню — фильтруем их в игровом состоянии
 MENU_TEXTS = frozenset({
     "🏠 Главное меню",
     "📊 Статистика",
@@ -42,8 +42,86 @@ MENU_TEXTS = frozenset({
     "💡 Подсказка дня",
     "⚡ Энергия",
     "🎮 Играть",
+    "🤖 Спросить ИИ",  # ← ДОБАВЛЕНО чтобы не перехватывался в игре
 })
 
+
+# ---------------------------------------------------------------------------
+# Вспомогательные функции для отправки результата игры + факта от ИИ
+# ---------------------------------------------------------------------------
+
+async def _send_win(
+    message: Message,
+    session: GameSession,
+    result,
+    user: User,
+    db: AsyncSession,
+) -> None:
+    """Отправить сообщение о победе, затем интересный факт от LLM."""
+    await message.answer(
+        WIN_MESSAGE.format(
+            word=session.gene.name,
+            attempts=result.attempt_number,
+            max_attempts=session.max_attempts,
+            points=result.points_earned,
+            gene_name=session.gene.name,
+            gene_description=session.gene.description,
+            total_points=user.total_points,
+        )
+    )
+    await _send_gene_fact(message, session.gene.name, session.gene.description, db=db, user=user)
+
+
+async def _send_lose(
+    message: Message,
+    session: GameSession,
+    user: User | None,
+    db: AsyncSession,
+) -> None:
+    """Отправить сообщение о поражении, затем интересный факт от LLM."""
+    await message.answer(
+        LOSE_MESSAGE.format(
+            word=session.gene.name,
+            gene_name=session.gene.name,
+            gene_description=session.gene.description,
+            total_points=user.total_points if user else 0,
+        )
+    )
+    await _send_gene_fact(message, session.gene.name, session.gene.description, db=db, user=user)
+
+
+async def _send_gene_fact(
+    message: Message,
+    gene_name: str,
+    gene_description: str,
+    db: AsyncSession,
+    user: User | None,
+) -> None:
+    """
+    Запросить интересный факт у LLM и отправить пользователю.
+
+    Если LLM не настроена или вернула ошибку — молча пропускаем,
+    игровой процесс не ломается.
+    """
+    if not settings.llm_enabled:
+        return
+
+    try:
+        await message.bot.send_chat_action(  # type: ignore[union-attr]
+            chat_id=message.chat.id, action="typing"
+        )
+        llm = LLMService(db=db, user_id=user.id if user else None)
+        fact, _, _ = await llm.get_gene_fact(gene_name, gene_description)
+        await message.answer(
+            f"🧬 <b>Интересный факт о {gene_name}</b>\n\n{fact}"
+        )
+    except Exception as e:
+        logger.warning("Failed to send gene fact", gene=gene_name, error=str(e))
+
+
+# ---------------------------------------------------------------------------
+# Хендлеры
+# ---------------------------------------------------------------------------
 
 @router.message(F.text == "🎮 Играть")
 async def start_game(
@@ -123,7 +201,6 @@ async def start_game(
         await state.set_state(GameStates.waiting_for_guess)
         await state.update_data(session_id=existing_game.id)
 
-        can_use_hint = current_energy >= settings.energy_per_hint and not existing_game.hint_used
         await message.answer(
             f"🎮 <b>Продолжаем игру!</b>\n\n"
             f"Слово из {len(gene.name)} букв\n"
@@ -140,9 +217,7 @@ async def start_game(
         await state.update_data(session_id=session.id)
         await state.set_state(GameStates.waiting_for_guess)
 
-        can_use_hint = current_energy >= settings.energy_per_hint
         hidden_word = "_ " * len(gene.name)
-
         await message.answer(
             GAME_START_MESSAGE.format(
                 length=len(gene.name),
@@ -205,28 +280,13 @@ async def process_guess(
         result_viz = format_attempt_result(result.result)
 
         if result.is_correct:
-            await message.answer(
-                WIN_MESSAGE.format(
-                    word=session.gene.name,
-                    attempts=result.attempt_number,
-                    max_attempts=session.max_attempts,
-                    points=result.points_earned,
-                    gene_name=session.gene.name,
-                    gene_description=session.gene.description,
-                    total_points=user.total_points,
-                )
-            )
+            # ↓↓↓ ИЗМЕНЕНО: вместо прямого message.answer — вызов _send_win
+            await _send_win(message, session, result, user, db=db)
             await state.clear()
 
         elif result.is_game_over:
-            await message.answer(
-                LOSE_MESSAGE.format(
-                    word=session.gene.name,
-                    gene_name=session.gene.name,
-                    gene_description=session.gene.description,
-                    total_points=user.total_points,
-                )
-            )
+            # ↓↓↓ ИЗМЕНЕНО: вместо прямого message.answer — вызов _send_lose
+            await _send_lose(message, session, user, db=db)
             await state.clear()
 
         else:
@@ -248,7 +308,6 @@ async def process_guess(
 
             await energy_service.spend_energy(user.id, settings.energy_per_attempt)
             current_energy -= settings.energy_per_attempt
-            can_use_hint = current_energy >= settings.energy_per_hint
 
             await message.answer(
                 ATTEMPT_RESULT_MESSAGE.format(
@@ -343,17 +402,8 @@ async def surrender_game(
     await db.commit()
     await db.refresh(session, ["gene"])
 
-    lose_text = LOSE_MESSAGE.format(
-        word=session.gene.name,
-        gene_name=session.gene.name,
-        gene_description=session.gene.description,
-        total_points=user.total_points if user else 0,
-    )
     if isinstance(callback.message, Message):
-        await callback.message.edit_text(lose_text)
-    else:
-        await callback.bot.send_message(  # type: ignore[union-attr]
-            chat_id=callback.from_user.id, text=lose_text
-        )
+        await _send_lose(callback.message, session, user, db=db)
+
     await state.clear()
     await callback.answer("Игра завершена")
