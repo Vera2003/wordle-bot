@@ -1,9 +1,9 @@
-name: 🚀 Deploy to Production
+name: CI/CD
 
 on:
   push:
     branches:
-      - main  # деплоим только при пуше в main
+      - dev  # деплоим только при пуше в main
 
 jobs:
   # ─────────────────────────────────────────
