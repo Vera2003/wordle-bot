@@ -249,20 +249,7 @@ jobs:
               exit 1
             fi
 
-            BOT_EXISTS=$(docker ps -a --format '{{.Names}}' | awk 'BEGIN{found="no"} $0=="genetic-wordle-bot"{found="yes"} END{print found}')
-            if [ "$BOT_EXISTS" = "yes" ]; then
-              echo "🤖 Restarting bot container..."
-              APP_IMAGE="$APP_IMAGE" APP_TAG="$APP_TAG" \
-                docker compose -f ci-cd-files/docker-compose.registry.yml --profile polling up -d --force-recreate bot
-              BOT_IMAGE_ID=$(docker inspect genetic-wordle-bot --format='{{.Image}}')
-              echo "Running bot image ID: ${BOT_IMAGE_ID}"
-              if [ "${BOT_IMAGE_ID}" != "${PULLED_IMAGE_ID}" ]; then
-                echo "❌ Bot container is not running pulled image"
-                exit 1
-              fi
-            else
-              echo "ℹ️ Bot container not found, skipping bot restart"
-            fi
+            echo "ℹ️ Bot restart is skipped in CI deploy step"
 
             echo "🧬 Running DB init (skips if already exists)..."
             APP_IMAGE="$APP_IMAGE" APP_TAG="$APP_TAG" \
