@@ -58,11 +58,7 @@ services:
       redis:
         condition: service_healthy
     restart: unless-stopped
-    networks:
-      - app-network
-    dns:
-      - 8.8.8.8
-      - 8.8.4.4
+    network_mode: "host"
     # logging:
     #   driver: "json-file"
     #   options:
