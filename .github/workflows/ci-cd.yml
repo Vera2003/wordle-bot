@@ -101,6 +101,9 @@ jobs:
           file: ci-cd-files/Dockerfile
           target: production
           push: true
+          labels: |
+            org.opencontainers.image.source=${{ github.server_url }}/${{ github.repository }}
+            org.opencontainers.image.revision=${{ github.sha }}
           # Два тега: точный (sha) и latest
           tags: |
             ${{ steps.vars.outputs.image_repo }}:${{ steps.vars.outputs.app_tag }}
@@ -159,8 +162,12 @@ jobs:
           script_stop: true
           envs: REGISTRY,REGISTRY_USERNAME,REGISTRY_PASSWORD,APP_TAG,DEPLOY_SHA
           script: |
-            echo "Script started at $(date)" > /tmp/deploy-$$.log
-            
+            LOG_FILE="/tmp/deploy-${DEPLOY_SHA}.log"
+            : > "$LOG_FILE"
+            exec 3>&1
+            exec >> "$LOG_FILE" 2>&1
+
+            echo "Script started at $(date)"
             set -eux
             APP_DIR="${{ secrets.APP_DIR }}"
             cd "$APP_DIR"
@@ -174,6 +181,10 @@ jobs:
 
             echo "Using image: $APP_IMAGE:$APP_TAG"
 
+            echo "🔎 Docker versions"
+            docker --version
+            docker compose version
+
             echo "📥 Pulling latest code..."
             git fetch --all --prune
             git checkout stage
@@ -186,11 +197,25 @@ jobs:
             echo "🧷 Pulling exact image tag: ${APP_IMAGE}:${APP_TAG}"
             docker pull "${APP_IMAGE}:${APP_TAG}"
             PULLED_IMAGE_ID=$(docker image inspect "${APP_IMAGE}:${APP_TAG}" --format='{{.Id}}')
+            PULLED_IMAGE_REV=$(docker image inspect "${APP_IMAGE}:${APP_TAG}" --format='{{ index .Config.Labels "org.opencontainers.image.revision" }}')
             echo "Pulled image ID: ${PULLED_IMAGE_ID}"
+            echo "Pulled image revision label: ${PULLED_IMAGE_REV}"
+            if [ -z "${PULLED_IMAGE_REV}" ]; then
+              echo "❌ Pulled image has no revision label"
+              exit 1
+            fi
+            if [ "${PULLED_IMAGE_REV}" != "${DEPLOY_SHA}" ]; then
+              echo "❌ Pulled image revision ${PULLED_IMAGE_REV} != deploy sha ${DEPLOY_SHA}"
+              exit 1
+            fi
 
-            echo "📦 Pulling new image: ${APP_IMAGE}:${APP_TAG}"
-            APP_IMAGE="$APP_IMAGE" APP_TAG="$APP_TAG" \
-              docker compose -f ci-cd-files/docker-compose.registry.yml pull api
+            echo "📦 Validating resolved compose image..."
+            RESOLVED_IMAGE=$(APP_IMAGE="$APP_IMAGE" APP_TAG="$APP_TAG" docker compose -f ci-cd-files/docker-compose.registry.yml config | awk '/^[[:space:]]*image:[[:space:]]/{print $2; exit}')
+            echo "Resolved compose image: ${RESOLVED_IMAGE}"
+            if [ "${RESOLVED_IMAGE}" != "${APP_IMAGE}:${APP_TAG}" ]; then
+              echo "❌ Compose resolved image mismatch"
+              exit 1
+            fi
 
             echo "🗄️ Starting postgres and redis..."
             # APP_IMAGE и APP_TAG передаём чтобы не было warnings
@@ -208,7 +233,7 @@ jobs:
 
             echo "🔄 Restarting api container..."
             APP_IMAGE="$APP_IMAGE" APP_TAG="$APP_TAG" \
-              docker compose -f ci-cd-files/docker-compose.registry.yml up -d --remove-orphans --force-recreate api
+              docker compose -f ci-cd-files/docker-compose.registry.yml up -d --pull always --remove-orphans --force-recreate api
 
             echo "🧾 Verifying running api image..."
             API_IMAGE_ID=$(docker inspect genetic-wordle-api --format='{{.Image}}')
@@ -245,3 +270,4 @@ jobs:
               docker compose -f ci-cd-files/docker-compose.registry.yml ps
 
             echo "✅ Deploy complete! SHA: ${DEPLOY_SHA}"
+            cat "$LOG_FILE" >&3
