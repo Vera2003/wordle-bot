@@ -168,13 +168,15 @@ jobs:
             APP_DIR="${{ secrets.APP_DIR }}"
             cd "$APP_DIR"
 
-            echo "APP_IMAGE='$APP_IMAGE'"
-            echo "APP_TAG='$APP_TAG'"
+            echo "APP_IMAGE(raw)='${APP_IMAGE-}'"
+            echo "APP_TAG(raw)='${APP_TAG-}'"
 
             USERNAME_LOWER=$(echo "$REGISTRY_USERNAME" | tr '[:upper:]' '[:lower:]')
             : "${APP_IMAGE:=docker.io/${USERNAME_LOWER}/genetic-wordle}"
             : "${APP_TAG:=latest}"
 
+            echo "APP_IMAGE='$APP_IMAGE'"
+            echo "APP_TAG='$APP_TAG'"
             echo "Using image: $APP_IMAGE:$APP_TAG"
 
             echo "🔎 Docker versions"
