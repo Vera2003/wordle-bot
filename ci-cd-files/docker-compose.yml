@@ -60,6 +60,9 @@ services:
     restart: unless-stopped
     networks:
       - app-network
+    dns:
+      - 8.8.8.8
+      - 8.8.4.4
     # logging:
     #   driver: "json-file"
     #   options:
@@ -153,3 +156,5 @@ volumes:
 networks:
   app-network:
     driver: bridge
+    driver_opts:
+      com.docker.network.driver.mtu: 1500
