@@ -157,7 +157,7 @@ jobs:
           script_stop: true
           envs: REGISTRY,REGISTRY_USERNAME,REGISTRY_PASSWORD,APP_IMAGE,APP_TAG,DEPLOY_SHA
           script: |
-            set -eu
+            set -eux
             APP_DIR="${{ secrets.APP_DIR }}"
             cd "$APP_DIR"
 
