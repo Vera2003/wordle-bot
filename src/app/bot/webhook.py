@@ -57,32 +57,44 @@ async def setup_webhook(bot: Bot, webhook_url: str, secret_token: str = ""):
         webhook_url: URL для webhook (https://example.com/webhook/bot)
         secret_token: Секретный токен для валидации запросов
     """
-    try:
-        # Удаляем старый webhook
-        await bot.delete_webhook(drop_pending_updates=True)
-        logger.info("Старый webhook удалён")
-        
-        # Устанавливаем новый webhook
-        success = await bot.set_webhook(
-            url=webhook_url,
-            secret_token=secret_token,
-            allowed_updates=["message", "callback_query"],
-            drop_pending_updates=False
-        )
-        
-        if not success:
-            raise RuntimeError("Failed to set webhook")
-        
-        # Проверяем установку
-        webhook_info = await bot.get_webhook_info()
-        logger.info(f"✅ Webhook установлен: {webhook_info.url}")
-        logger.info(f"Pending updates: {webhook_info.pending_update_count}")
-        
-        return True
-        
-    except Exception as e:
-        logger.error(f"❌ Ошибка настройки webhook: {e}", exc_info=True)
-        return False
+    import asyncio
+    
+    max_retries = 3
+    for attempt in range(max_retries):
+        try:
+            # Удаляем старый webhook
+            await bot.delete_webhook(drop_pending_updates=True)
+            logger.info("Старый webhook удалён")
+            
+            # Устанавливаем новый webhook
+            success = await bot.set_webhook(
+                url=webhook_url,
+                secret_token=secret_token,
+                allowed_updates=["message", "callback_query"],
+                drop_pending_updates=False
+            )
+            
+            if not success:
+                raise RuntimeError("Failed to set webhook")
+            
+            # Проверяем установку
+            webhook_info = await bot.get_webhook_info()
+            logger.info(f"✅ Webhook установлен: {webhook_info.url}")
+            logger.info(f"Pending updates: {webhook_info.pending_update_count}")
+            return
+            
+        except Exception as e:
+            logger.error(
+                f"❌ Ошибка настройки webhook (попытка {attempt + 1}/{max_retries}): {str(e)}"
+            )
+            if attempt < max_retries - 1:
+                await asyncio.sleep(5 * (attempt + 1))  # Ждём 5, 10, 15 сек
+            else:
+                logger.warning(
+                    "⚠️  Не удалось настроить webhook после всех попыток. "
+                    "Приложение продолжит работу, но webhook не будет работать."
+                )
+                return
 
 
 async def remove_webhook(bot: Bot):
