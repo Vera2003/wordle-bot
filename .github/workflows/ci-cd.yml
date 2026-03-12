@@ -146,8 +146,8 @@ jobs:
           REGISTRY: docker.io
           REGISTRY_USERNAME: ${{ secrets.REGISTRY_USERNAME }}
           REGISTRY_PASSWORD: ${{ secrets.REGISTRY_PASSWORD }}
-          APP_IMAGE: ${{ needs.build-and-push.outputs.app_image }}
-          APP_TAG: ${{ needs.build-and-push.outputs.app_tag }}
+          APP_IMAGE: ${{ needs.build-and-push.outputs.repository_image }}
+          APP_TAG: ${{ needs.build-and-push.outputs.backend_tag }}
           DEPLOY_SHA: ${{ github.sha }}
         with:
           host: ${{ secrets.SSH_HOST }}
