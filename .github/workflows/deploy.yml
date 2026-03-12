@@ -1,0 +1,69 @@
+name: 🚀 Deploy to Production
+
+on:
+  push:
+    branches:
+      - main  # деплоим только при пуше в main
+
+jobs:
+  # ─────────────────────────────────────────
+  # JOB 1: Запускаем тесты перед деплоем
+  # ─────────────────────────────────────────
+  test:
+    name: 🧪 Run Tests
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install Poetry
+        run: pip install poetry==1.8.2
+
+      - name: Install dependencies
+        run: poetry install --with dev
+
+      - name: Run tests
+        run: poetry run pytest -v --tb=short
+        env:
+          ENVIRONMENT: testing
+          BOT_TOKEN: test_token_12345
+          POSTGRES_HOST: localhost
+          POSTGRES_PORT: 5432
+          POSTGRES_DB: test_db
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: test_pass
+          REDIS_HOST: localhost
+          REDIS_PORT: 6379
+
+  # ─────────────────────────────────────────
+  # JOB 2: Деплой (только если тесты прошли)
+  # ─────────────────────────────────────────
+  deploy:
+    name: 🚀 Deploy
+    runs-on: ubuntu-latest
+    needs: test  # ждём успешного завершения тестов
+
+    steps:
+      - name: Deploy to server via SSH
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.SERVER_HOST }}
+          username: ${{ secrets.SERVER_USER }}
+          key: ${{ secrets.SERVER_SSH_KEY }}
+          script: |
+            cd /opt/genetic-wordle
+            bash deploy.sh
+
+      - name: Notify success
+        if: success()
+        run: echo "✅ Deployment successful!"
+
+      - name: Notify failure
+        if: failure()
+        run: echo "❌ Deployment failed!"
