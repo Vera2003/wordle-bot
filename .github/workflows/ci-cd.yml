@@ -1,6 +1,9 @@
 # .github/workflows/deploy.yml
 name: CI/CD
 
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+
 on:
   push:
     branches:
@@ -63,8 +66,7 @@ jobs:
     environment: production
 
     outputs:
-      # Передаём тег образа в следующий job
-      app_image: ${{ steps.vars.outputs.app_image }}
+      # Передаём только тег (без чувствительных частей)
       app_tag: ${{ steps.vars.outputs.app_tag }}
 
     steps:
@@ -77,8 +79,8 @@ jobs:
           REGISTRY_USERNAME: ${{ secrets.REGISTRY_USERNAME }}
         run: |
           USERNAME_LOWER=$(echo "$REGISTRY_USERNAME" | tr '[:upper:]' '[:lower:]')
-          # Образ: docker.io/yourusername/genetic-wordle
-          echo "app_image=docker.io/${USERNAME_LOWER}/genetic-wordle" >> "$GITHUB_OUTPUT"
+          # Репозиторий образа: docker.io/yourusername/genetic-wordle
+          echo "image_repo=docker.io/${USERNAME_LOWER}/genetic-wordle" >> "$GITHUB_OUTPUT"
           # Тег: sha коммита для точной версии + latest для удобства
           echo "app_tag=app-${GITHUB_SHA}" >> "$GITHUB_OUTPUT"
 
@@ -101,11 +103,11 @@ jobs:
           push: true
           # Два тега: точный (sha) и latest
           tags: |
-            ${{ steps.vars.outputs.app_image }}:${{ steps.vars.outputs.app_tag }}
-            ${{ steps.vars.outputs.app_image }}:latest
+            ${{ steps.vars.outputs.image_repo }}:${{ steps.vars.outputs.app_tag }}
+            ${{ steps.vars.outputs.image_repo }}:latest
           # Кэширование слоёв — ускоряет повторные билды
-          cache-from: type=registry,ref=${{ steps.vars.outputs.app_image }}:buildcache
-          cache-to: type=registry,ref=${{ steps.vars.outputs.app_image }}:buildcache,mode=max
+          cache-from: type=registry,ref=${{ steps.vars.outputs.image_repo }}:buildcache
+          cache-to: type=registry,ref=${{ steps.vars.outputs.image_repo }}:buildcache,mode=max
 
   # ──────────────────────────────────────────────────────────
   # JOB 3: Деплой на сервер
@@ -146,7 +148,6 @@ jobs:
           REGISTRY: docker.io
           REGISTRY_USERNAME: ${{ secrets.REGISTRY_USERNAME }}
           REGISTRY_PASSWORD: ${{ secrets.REGISTRY_PASSWORD }}
-          APP_IMAGE: ${{ needs.build-and-push.outputs.app_image }}
           APP_TAG: ${{ needs.build-and-push.outputs.app_tag }}
           DEPLOY_SHA: ${{ github.sha }}
         with:
@@ -156,7 +157,7 @@ jobs:
           key: ${{ secrets.SSH_PRIVATE_KEY }}
           port: 22
           script_stop: true
-          envs: REGISTRY,REGISTRY_USERNAME,REGISTRY_PASSWORD,APP_IMAGE,APP_TAG,DEPLOY_SHA
+          envs: REGISTRY,REGISTRY_USERNAME,REGISTRY_PASSWORD,APP_TAG,DEPLOY_SHA
           script: |
             echo "Script started at $(date)" > /tmp/deploy-$$.log
             
