@@ -159,15 +159,11 @@ jobs:
           username: ${{ secrets.SSH_USER }}
           key: ${{ secrets.SSH_PRIVATE_KEY }}
           port: 22
+          request_pty: true
           script_stop: true
           envs: REGISTRY,REGISTRY_USERNAME,REGISTRY_PASSWORD,APP_TAG,DEPLOY_SHA
           script: |
-            LOG_FILE="/tmp/deploy-${DEPLOY_SHA}.log"
-            : > "$LOG_FILE"
-            exec 3>&1
-            exec >> "$LOG_FILE" 2>&1
-
-            echo "Script started at $(date)"
+            echo "=== remote deploy start $(date) ==="
             set -eux
             APP_DIR="${{ secrets.APP_DIR }}"
             cd "$APP_DIR"
@@ -270,4 +266,3 @@ jobs:
               docker compose -f ci-cd-files/docker-compose.registry.yml ps
 
             echo "✅ Deploy complete! SHA: ${DEPLOY_SHA}"
-            cat "$LOG_FILE" >&3
