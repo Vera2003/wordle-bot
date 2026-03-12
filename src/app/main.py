@@ -87,12 +87,15 @@ async def lifespan(app: FastAPI):
         state.webhook_handler = WebhookHandler(
             bot=state.bot, dp=state.dp, secret_token=settings.webhook_secret
         )
-        await setup_webhook(
+        webhook_success = await setup_webhook(
             bot=state.bot,
             webhook_url=settings.webhook_url,
             secret_token=settings.webhook_secret,
         )
-        logger.info("✅ Webhook configured", url=settings.webhook_url)
+        if webhook_success:
+            logger.info("✅ Webhook configured", url=settings.webhook_url)
+        else:
+            logger.warning("⚠️  Webhook не настроен, но приложение работает", url=settings.webhook_url)
     else:
         logger.info("📡 Webhook disabled — use polling mode (task dev)")
 

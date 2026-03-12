@@ -81,7 +81,7 @@ async def setup_webhook(bot: Bot, webhook_url: str, secret_token: str = ""):
             webhook_info = await bot.get_webhook_info()
             logger.info(f"✅ Webhook установлен: {webhook_info.url}")
             logger.info(f"Pending updates: {webhook_info.pending_update_count}")
-            return
+            return True
             
         except Exception as e:
             logger.error(
@@ -94,7 +94,7 @@ async def setup_webhook(bot: Bot, webhook_url: str, secret_token: str = ""):
                     "⚠️  Не удалось настроить webhook после всех попыток. "
                     "Приложение продолжит работу, но webhook не будет работать."
                 )
-                return
+                return False
 
 
 async def remove_webhook(bot: Bot):
