@@ -1,0 +1,136 @@
+# docker-compose.registry.yml
+# Используется на сервере — тянет образы из Docker Hub, не билдит локально
+
+x-app-env: &app-env
+  ENVIRONMENT: ${ENVIRONMENT:-production}
+  BOT_TOKEN: ${BOT_TOKEN}
+  ADMIN_IDS: ${ADMIN_IDS:-[]}
+  ADMIN_API_KEY: ${ADMIN_API_KEY}
+  ALLOWED_ORIGINS: ${ALLOWED_ORIGINS:-[]}
+
+  USE_WEBHOOK: ${USE_WEBHOOK:-false}
+  WEBHOOK_DOMAIN: ${WEBHOOK_DOMAIN:-}
+  WEBHOOK_PATH: ${WEBHOOK_PATH:-/webhook/bot}
+  WEBHOOK_SECRET: ${WEBHOOK_SECRET:-}
+
+  APP_HOST: ${APP_HOST:-0.0.0.0}
+  APP_PORT: ${APP_PORT:-8000}
+
+  POSTGRES_HOST: postgres
+  POSTGRES_PORT: 5432
+  POSTGRES_DB: ${POSTGRES_DB:-genetic_wordle}
+  POSTGRES_USER: ${POSTGRES_USER:-postgres}
+  POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+
+  REDIS_HOST: redis
+  REDIS_PORT: 6379
+  REDIS_PASSWORD: ${REDIS_PASSWORD:-}
+  REDIS_DB: ${REDIS_DB:-0}
+
+  MAX_ATTEMPTS: ${MAX_ATTEMPTS:-6}
+  DAILY_ENERGY: ${DAILY_ENERGY:-6}
+  ENERGY_PER_ATTEMPT: ${ENERGY_PER_ATTEMPT:-1}
+  ENERGY_PER_HINT: ${ENERGY_PER_HINT:-2}
+  BONUS_ENERGY: ${BONUS_ENERGY:-3}
+
+  PROXYAPI_KEY: ${PROXYAPI_KEY:-}
+  PROXYAPI_MODEL: ${PROXYAPI_MODEL:-gpt-4o-mini}
+
+services:
+  api:
+    # Образ берётся из Docker Hub, не билдится локально
+    image: ${APP_IMAGE}:${APP_TAG}
+    container_name: genetic-wordle-api
+    command: uvicorn src.app.main:app --host 0.0.0.0 --port 8000
+    environment: *app-env
+    ports:
+      - "${APP_PORT:-8000}:8000"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    restart: unless-stopped
+    networks:
+      - app-network
+
+  # Polling бот — отдельный контейнер (запускается если USE_WEBHOOK=false)
+  bot:
+    image: ${APP_IMAGE}:${APP_TAG}
+    container_name: genetic-wordle-bot
+    command: python -m src.app.bot.main
+    environment: *app-env
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    restart: unless-stopped
+    networks:
+      - app-network
+    profiles:
+      - polling
+
+  postgres:
+    image: postgres:16-alpine
+    container_name: genetic-wordle-postgres
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-genetic_wordle}
+      POSTGRES_USER: ${POSTGRES_USER:-postgres}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      PGDATA: /var/lib/postgresql/data/pgdata
+    ports:
+      - "127.0.0.1:5433:5432"
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-postgres} -d ${POSTGRES_DB:-genetic_wordle}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+    restart: unless-stopped
+    networks:
+      - app-network
+
+  redis:
+    image: redis:7-alpine
+    container_name: genetic-wordle-redis
+    command: >
+      sh -c "
+      if [ -n '${REDIS_PASSWORD}' ]; then
+        redis-server --requirepass '${REDIS_PASSWORD}' --appendonly yes
+      else
+        redis-server --appendonly yes
+      fi
+      "
+    ports:
+      - "127.0.0.1:6379:6379"
+    volumes:
+      - redis-data:/data
+    healthcheck:
+      test: >
+        sh -c "
+        if [ -n '${REDIS_PASSWORD}' ]; then
+          redis-cli -a '${REDIS_PASSWORD}' ping
+        else
+          redis-cli ping
+        fi
+        "
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 5s
+    restart: unless-stopped
+    networks:
+      - app-network
+
+volumes:
+  postgres-data:
+    driver: local
+  redis-data:
+    driver: local
+
+networks:
+  app-network:
+    driver: bridge

@@ -1,20 +1,26 @@
+# .github/workflows/deploy.yml
 name: CI/CD
 
 on:
   push:
     branches:
-      - stage  # деплоим только при пуше в main
+      - stage
+  workflow_dispatch:  # позволяет запустить вручную из GitHub UI
+
+concurrency:
+  group: ci-cd-main
+  cancel-in-progress: true  # отменяем старый деплой если пришёл новый
 
 jobs:
-  # ─────────────────────────────────────────
-  # JOB 1: Запускаем тесты перед деплоем
-  # ─────────────────────────────────────────
+  # ──────────────────────────────────────────────────────────
+  # JOB 1: Тесты
+  # ──────────────────────────────────────────────────────────
   test:
-    name: 🧪 Run Tests
+    name: 🧪 Tests
     runs-on: ubuntu-latest
 
     steps:
-      - name: Checkout code
+      - name: Checkout
         uses: actions/checkout@v4
 
       - name: Set up Python
@@ -25,6 +31,12 @@ jobs:
       - name: Install Poetry
         run: pip install poetry==1.8.2
 
+      - name: Cache Poetry dependencies
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/pypoetry
+          key: poetry-${{ hashFiles('poetry.lock') }}
+
       - name: Install dependencies
         run: poetry install --with dev
 
@@ -32,38 +44,145 @@ jobs:
         run: poetry run pytest -v --tb=short
         env:
           ENVIRONMENT: testing
-          BOT_TOKEN: test_token_12345
+          BOT_TOKEN: test_token
           POSTGRES_HOST: localhost
-          POSTGRES_PORT: 5432
           POSTGRES_DB: test_db
           POSTGRES_USER: postgres
           POSTGRES_PASSWORD: test_pass
           REDIS_HOST: localhost
           REDIS_PORT: 6379
+          ADMIN_API_KEY: test_key
 
-  # ─────────────────────────────────────────
-  # JOB 2: Деплой (только если тесты прошли)
-  # ─────────────────────────────────────────
+  # ──────────────────────────────────────────────────────────
+  # JOB 2: Билд и пуш образа в Docker Hub
+  # ──────────────────────────────────────────────────────────
+  build-and-push:
+    name: 🐳 Build & Push Image
+    runs-on: ubuntu-latest
+    needs: test  # запускается только если тесты прошли
+    environment: production
+
+    outputs:
+      # Передаём тег образа в следующий job
+      app_image: ${{ steps.vars.outputs.app_image }}
+      app_tag: ${{ steps.vars.outputs.app_tag }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set image variables
+        id: vars
+        env:
+          REGISTRY_USERNAME: ${{ secrets.REGISTRY_USERNAME }}
+        run: |
+          USERNAME_LOWER=$(echo "$REGISTRY_USERNAME" | tr '[:upper:]' '[:lower:]')
+          # Образ: docker.io/yourusername/genetic-wordle
+          echo "app_image=docker.io/${USERNAME_LOWER}/genetic-wordle" >> "$GITHUB_OUTPUT"
+          # Тег: sha коммита для точной версии + latest для удобства
+          echo "app_tag=app-${GITHUB_SHA}" >> "$GITHUB_OUTPUT"
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Login to Docker Hub
+        uses: docker/login-action@v3
+        with:
+          registry: docker.io
+          username: ${{ secrets.REGISTRY_USERNAME }}
+          password: ${{ secrets.REGISTRY_PASSWORD }}
+
+      - name: Build and push
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: ci-cd-files/Dockerfile
+          target: production
+          push: true
+          # Два тега: точный (sha) и latest
+          tags: |
+            ${{ steps.vars.outputs.app_image }}:${{ steps.vars.outputs.app_tag }}
+            ${{ steps.vars.outputs.app_image }}:latest
+          # Кэширование слоёв — ускоряет повторные билды
+          cache-from: type=registry,ref=${{ steps.vars.outputs.app_image }}:buildcache
+          cache-to: type=registry,ref=${{ steps.vars.outputs.app_image }}:buildcache,mode=max
+
+  # ──────────────────────────────────────────────────────────
+  # JOB 3: Деплой на сервер
+  # ──────────────────────────────────────────────────────────
   deploy:
     name: 🚀 Deploy
     runs-on: ubuntu-latest
-    needs: test  # ждём успешного завершения тестов
+    needs: build-and-push
+    environment: production
 
     steps:
-      - name: Deploy to server via SSH
-        uses: appleboy/ssh-action@v1.0.3
+      - name: Validate secrets
+        env:
+          SSH_HOST: ${{ secrets.SSH_HOST }}
+          SSH_USER: ${{ secrets.SSH_USER }}
+          SSH_PRIVATE_KEY: ${{ secrets.SSH_PRIVATE_KEY }}
+          APP_DIR: ${{ secrets.APP_DIR }}
+          REGISTRY_USERNAME: ${{ secrets.REGISTRY_USERNAME }}
+          REGISTRY_PASSWORD: ${{ secrets.REGISTRY_PASSWORD }}
+        run: |
+          set -eu
+          missing=""
+          for name in SSH_HOST SSH_USER SSH_PRIVATE_KEY APP_DIR REGISTRY_USERNAME REGISTRY_PASSWORD; do
+            eval "value=\${$name}"
+            if [ -z "$value" ]; then
+              missing="$missing $name"
+            fi
+          done
+          if [ -n "$missing" ]; then
+            echo "❌ Missing secrets:$missing"
+            exit 1
+          fi
+          echo "✅ All secrets present"
+
+      - name: Deploy over SSH
+        uses: appleboy/ssh-action@v1.2.0
+        env:
+          REGISTRY: docker.io
+          REGISTRY_USERNAME: ${{ secrets.REGISTRY_USERNAME }}
+          REGISTRY_PASSWORD: ${{ secrets.REGISTRY_PASSWORD }}
+          APP_IMAGE: ${{ needs.build-and-push.outputs.app_image }}
+          APP_TAG: ${{ needs.build-and-push.outputs.app_tag }}
+          DEPLOY_SHA: ${{ github.sha }}
         with:
-          host: ${{ secrets.SERVER_HOST }}
-          username: ${{ secrets.SERVER_USER }}
-          key: ${{ secrets.SERVER_SSH_KEY }}
+          host: ${{ secrets.SSH_HOST }}
+          username: ${{ secrets.SSH_USER }}
+          key: ${{ secrets.SSH_PRIVATE_KEY }}
+          port: 22
+          script_stop: true
+          envs: REGISTRY,REGISTRY_USERNAME,REGISTRY_PASSWORD,APP_IMAGE,APP_TAG,DEPLOY_SHA
           script: |
-            cd /opt/genetic-wordle
-            bash deploy.sh
+            set -eu
 
-      - name: Notify success
-        if: success()
-        run: echo "✅ Deployment successful!"
+            APP_DIR="${{ secrets.APP_DIR }}"
+            cd "$APP_DIR"
 
-      - name: Notify failure
-        if: failure()
-        run: echo "❌ Deployment failed!"
+            echo "📥 Pulling latest code..."
+            git fetch --all --prune
+            git checkout main
+            git reset --hard origin/main
+
+            echo "🔐 Logging into Docker Hub..."
+            echo "$REGISTRY_PASSWORD" | docker login "$REGISTRY" \
+              -u "$REGISTRY_USERNAME" --password-stdin
+
+            echo "📦 Pulling new image: ${APP_IMAGE}:${APP_TAG}"
+            APP_IMAGE="$APP_IMAGE" APP_TAG="$APP_TAG" \
+              docker compose -f docker-compose.registry.yml pull api
+
+            echo "🔄 Restarting containers..."
+            APP_IMAGE="$APP_IMAGE" APP_TAG="$APP_TAG" \
+              docker compose -f docker-compose.registry.yml up -d --remove-orphans
+
+            echo "🧹 Cleaning old images..."
+            docker image prune -f
+
+            echo "📊 Container status:"
+            docker compose -f docker-compose.registry.yml ps
+
+            echo "✅ Deploy complete! SHA: ${DEPLOY_SHA}"
