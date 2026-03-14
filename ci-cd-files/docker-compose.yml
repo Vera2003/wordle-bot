@@ -44,6 +44,7 @@ services:
       context: ..
       dockerfile: ci-cd-files/Dockerfile
       target: production
+    container_name: genetic-wordle-migrations
     command: sh -c "poetry run alembic upgrade head"
     environment: *app-env
     depends_on:
@@ -51,6 +52,7 @@ services:
         condition: service_healthy
     networks:
       - app-network
+    restart: "no"
   # FastAPI + Bot (Webhook)
   api:
     build:
@@ -70,7 +72,7 @@ services:
       redis:
         condition: service_healthy
       migrations:
-        condition: service_completed_successfully
+        condition: service_started
     restart: unless-stopped
     networks:
       - app-network
