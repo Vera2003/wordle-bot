@@ -39,20 +39,6 @@ x-app-env: &app-env
   PROXYAPI_MODEL: ${PROXYAPI_MODEL:-gpt-4o-mini}
 
 services:
-  migrations:
-    build:
-      context: ..
-      dockerfile: ci-cd-files/Dockerfile
-      target: production
-    container_name: genetic-wordle-migrations
-    command: sh -c "poetry run alembic upgrade head"
-    environment: *app-env
-    depends_on:
-      postgres:
-        condition: service_healthy
-    networks:
-      - app-network
-    restart: "no"
   # FastAPI + Bot (Webhook)
   api:
     build:
@@ -60,7 +46,7 @@ services:
       dockerfile: ci-cd-files/Dockerfile
       target: production
     container_name: genetic-wordle-api
-    command: uvicorn src.app.main:app --host 0.0.0.0 --port 8000
+    command: sh -c "poetry run alembic upgrade head && uvicorn src.app.main:app --host 0.0.0.0 --port 8000"
     environment: *app-env
     ports:
       - "${APP_PORT:-8000}:8000"
@@ -71,8 +57,6 @@ services:
         condition: service_healthy
       redis:
         condition: service_healthy
-      migrations:
-        condition: service_started
     restart: unless-stopped
     networks:
       - app-network
