@@ -13,7 +13,7 @@ from aiogram.client.default import DefaultBotProperties
 from aiogram.enums import ParseMode
 from aiogram.fsm.storage.redis import RedisStorage
 
-from .handlers import achievements, admin, game, start
+from .handlers import achievements, admin, chat, game, start
 from .middleware.db import DbSessionMiddleware
 from .middleware.logging import LoggingMiddleware
 from .middleware.user import UserMiddleware
@@ -59,6 +59,7 @@ async def main() -> None:
     dp.include_router(game.router)
     dp.include_router(achievements.router)
     dp.include_router(admin.router)
+    dp.include_router(chat.router)
 
     logger.info("🤖 Starting bot in polling mode...")
 
