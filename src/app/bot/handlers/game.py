@@ -402,8 +402,9 @@ async def surrender_game(
     await db.commit()
     await db.refresh(session, ["gene"])
 
+    # ✅ Отвечаем на callback ДО медленных операций (LLM-вызов в _send_lose)
+    await callback.answer("Игра завершена")
+    await state.clear()
+
     if isinstance(callback.message, Message):
         await _send_lose(callback.message, session, user, db=db)
-
-    await state.clear()
-    await callback.answer("Игра завершена")
