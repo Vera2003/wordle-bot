@@ -7,6 +7,8 @@ from .commands import (
     CreateGeneHandler,
     DeactivateGeneCommand,
     DeactivateGeneHandler,
+    UpdateGeneCommand,
+    UpdateGeneHandler,
 )
 from .dto import GeneOutput, GeneSummaryOutput
 from .queries import (
@@ -14,6 +16,8 @@ from .queries import (
     GetActiveGenesQuery,
     GetGeneByIdHandler,
     GetGeneByIdQuery,
+    ListGenesHandler,
+    ListGenesQuery,
     GetRandomActiveGeneHandler,
     GetRandomActiveGeneQuery,
 )
@@ -27,10 +31,14 @@ __all__ = [
     "ActivateGeneHandler",
     "DeactivateGeneCommand",
     "DeactivateGeneHandler",
+    "UpdateGeneCommand",
+    "UpdateGeneHandler",
     "GetGeneByIdHandler",
     "GetGeneByIdQuery",
     "GetActiveGenesHandler",
     "GetActiveGenesQuery",
+    "ListGenesHandler",
+    "ListGenesQuery",
     "GetRandomActiveGeneHandler",
     "GetRandomActiveGeneQuery",
 ]

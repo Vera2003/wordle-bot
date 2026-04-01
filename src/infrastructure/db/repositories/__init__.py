@@ -1,5 +1,22 @@
-"""Database repositories - implementations of domain repository interfaces."""
+"""Database repositories."""
 
-from .game import SQLAlchemyGameRepository
+from .achievement import AchievementTypeRepositoryImpl, UserAchievementRepositoryImpl
+from .game import GameRepositoryImpl, SQLAlchemyGameRepository
+from .gene import GeneRepositoryImpl
+from .llm import LLMLogRepositoryImpl
+from .prize import PrizeRepositoryImpl, UserPrizeRepositoryImpl
+from .stats import StatsRepositoryImpl
+from .user import UserRepositoryImpl
 
-__all__ = ["SQLAlchemyGameRepository"]
+__all__ = [
+	"UserRepositoryImpl",
+	"GameRepositoryImpl",
+	"SQLAlchemyGameRepository",
+	"StatsRepositoryImpl",
+	"GeneRepositoryImpl",
+	"PrizeRepositoryImpl",
+	"UserPrizeRepositoryImpl",
+	"AchievementTypeRepositoryImpl",
+	"UserAchievementRepositoryImpl",
+	"LLMLogRepositoryImpl",
+]

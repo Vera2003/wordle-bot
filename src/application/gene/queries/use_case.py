@@ -72,6 +72,24 @@ class GetActiveGenesHandler:
         return [_to_gene_summary(gene) for gene in genes]
 
 
+class ListGenesQuery(BaseModel):
+    """Query to fetch all genes for admin screens."""
+
+    model_config = ConfigDict(extra="forbid")
+
+
+class ListGenesHandler:
+    """Handler for listing all genes."""
+
+    def __init__(self, gene_repository: GeneRepository):
+        self.gene_repository = gene_repository
+
+    async def __call__(self, query: ListGenesQuery) -> list[GeneOutput]:
+        del query
+        genes = await self.gene_repository.get_all_genes()
+        return [_to_gene_output(gene) for gene in genes]
+
+
 class GetRandomActiveGeneQuery(BaseModel):
     """Query to fetch one random active gene."""
 

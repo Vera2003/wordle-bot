@@ -71,9 +71,21 @@ async def test_llm_repository_filters_failed_slow_type_and_date_range(db):
         datetime(2026, 1, 4, 0, 0, 0),
         datetime(2026, 1, 4, 23, 59, 59),
     )
+    all_logs = await repo.list_logs(offset=0, limit=10)
+    fallback_logs = await repo.list_logs(offset=0, limit=10, fallback_only=True)
+    chat_count = await repo.count_logs(request_type=LLMRequestType.CHAT)
+    fallback_count = await repo.count_logs(fallback_only=True)
+    avg_latency = await repo.get_average_latency()
+    counts = await repo.get_request_counts_by_type()
 
     assert len(user_logs) == 2
     assert [item.id for item in failed_logs] == [failed_entry.id]
     assert [item.id for item in slow_logs] == [failed_entry.id]
     assert [item.id for item in chat_logs] == [failed_entry.id]
     assert [item.id for item in range_logs] == [failed_entry.id]
+    assert [item.id for item in all_logs] == [failed_entry.id, ok_entry.id]
+    assert [item.id for item in fallback_logs] == [failed_entry.id]
+    assert chat_count == 1
+    assert fallback_count == 1
+    assert avg_latency == 2500.0
+    assert counts == {LLMRequestType.FACT: 1, LLMRequestType.CHAT: 1}

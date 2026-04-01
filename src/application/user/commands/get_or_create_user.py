@@ -1,11 +1,13 @@
 """GetOrCreate user command."""
 
-from datetime import datetime
+from datetime import datetime, timezone
 from uuid import UUID
 
 from pydantic import BaseModel, ConfigDict, Field
 
+from src.core.config import get_settings
 from src.domain.user import User, TelegramId, Username, UserRepository
+from src.domain.user.value_objects import Energy
 
 
 def _username_value(username: Username | None) -> str | None:
@@ -49,6 +51,7 @@ class GetOrCreateUserHandler:
         """Execute command."""
         from uuid import uuid4
         
+        settings = get_settings()
         telegram_id = TelegramId(command.telegram_id)
         
         # Try to get existing user
@@ -83,6 +86,8 @@ class GetOrCreateUserHandler:
             telegram_id=telegram_id,
             username=Username(command.username) if command.username else Username(None),
             full_name=command.full_name,
+            energy=Energy(settings.daily_energy, settings.daily_energy),
+            last_energy_reset=datetime.now(timezone.utc).replace(tzinfo=None),
         )
         
         await self.user_repository.save(new_user)

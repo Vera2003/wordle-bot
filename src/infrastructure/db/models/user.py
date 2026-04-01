@@ -21,6 +21,7 @@ class UserModel(Base):
     full_name: Mapped[str | None] = mapped_column(String(128), nullable=True)
     energy: Mapped[int] = mapped_column(Integer, default=5, nullable=False)
     total_points: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
+    last_energy_reset: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, nullable=False)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, nullable=False)
     updated_at: Mapped[datetime] = mapped_column(
         DateTime,

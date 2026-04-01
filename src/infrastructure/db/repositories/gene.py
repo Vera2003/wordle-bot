@@ -47,6 +47,12 @@ class GeneRepositoryImpl(GeneRepository):
         )
         return [GeneMapper.model_to_domain(model) for model in result.scalars().all()]
 
+    async def get_all_genes(self) -> list[Gene]:
+        result = await self.session.execute(
+            select(GeneModel).order_by(GeneModel.name.asc())
+        )
+        return [GeneMapper.model_to_domain(model) for model in result.scalars().all()]
+
     async def get_random_active(self) -> Optional[Gene]:
         result = await self.session.execute(
             select(GeneModel)

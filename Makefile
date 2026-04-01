@@ -1,4 +1,4 @@
-.PHONY: help install run-api run-bot docker-up docker-down lint test test-unit test-integration migrate revision all
+.PHONY: help install run-api run-bot docker-up docker-down lint test test-unit test-integration db-init migrate revision all
 
 # Переменные
 PYTHON := uv run python
@@ -13,10 +13,10 @@ install: ## Установить все зависимости (основные
 	uv sync --all-groups
 
 run-api: ## Запустить FastAPI сервер (http://localhost:8000)
-	$(PYTHON) -m src.app.main
+	$(PYTHON) -m src.bootstrap.api
 
 run-bot: ## Запустить Telegram бота в polling режиме
-	$(PYTHON) -m src.app.bot.main
+	$(PYTHON) -m src.bootstrap.bot
 
 docker-up: ## Поднять Docker контейнеры (Postgres, Redis)
 	docker-compose -f ci-cd-files/docker-compose.yml up -d
@@ -45,6 +45,9 @@ test-integration: ## Запустить только integration тесты
 
 test-cov: ## Запустить тесты с отчетом покрытия
 	$(PYTEST) src/tests --cov=src --cov-report=html --cov-report=term
+
+db-init: ## Инициализировать базовые данные (гены, достижения, призы)
+	$(PYTHON) scripts/init_genes.py
 
 migrate: ## Применить миграции Alembic (upgrade head)
 	$(PYTHON) -m alembic upgrade head

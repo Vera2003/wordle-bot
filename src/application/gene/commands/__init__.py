@@ -7,6 +7,8 @@ from .use_case import (
     CreateGeneHandler,
     DeactivateGeneCommand,
     DeactivateGeneHandler,
+    UpdateGeneCommand,
+    UpdateGeneHandler,
 )
 
 __all__ = [
@@ -16,4 +18,6 @@ __all__ = [
     "ActivateGeneHandler",
     "DeactivateGeneCommand",
     "DeactivateGeneHandler",
+    "UpdateGeneCommand",
+    "UpdateGeneHandler",
 ]

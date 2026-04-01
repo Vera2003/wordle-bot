@@ -5,6 +5,8 @@ from .use_case import (
     GetActiveGenesQuery,
     GetGeneByIdHandler,
     GetGeneByIdQuery,
+    ListGenesHandler,
+    ListGenesQuery,
     GetRandomActiveGeneHandler,
     GetRandomActiveGeneQuery,
 )
@@ -14,6 +16,8 @@ __all__ = [
     "GetGeneByIdQuery",
     "GetActiveGenesHandler",
     "GetActiveGenesQuery",
+    "ListGenesHandler",
+    "ListGenesQuery",
     "GetRandomActiveGeneHandler",
     "GetRandomActiveGeneQuery",
 ]

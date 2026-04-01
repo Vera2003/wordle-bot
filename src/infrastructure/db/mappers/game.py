@@ -57,10 +57,9 @@ class GameMapper:
         game.points_earned = model.points_earned
         game.hint_used = model.hint_used
         
-        # Load all attempts from the model's relationship
-        # Note: attempts_history is lazy-loaded in async, so we skip it for now
-        # In production, use selectinload in the query to eagerly load attempts
-        # For now, attempts list remains empty (game just restored without history)
+        attempts = sorted(model.attempts_history, key=lambda item: item.attempt_number)
+        for attempt_model in attempts:
+            game._attempts.append(GameMapper._model_attempt_to_domain(attempt_model))
         
         return game
     

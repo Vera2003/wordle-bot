@@ -4,6 +4,7 @@ from datetime import datetime
 from typing import Optional
 from uuid import UUID
 
+from sqlalchemy import func
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.future import select
 
@@ -89,3 +90,47 @@ class LLMLogRepositoryImpl(LLMLogRepository):
             .order_by(LLMLogModel.created_at.desc())
         )
         return [LLMLogMapper.model_to_domain(model) for model in result.scalars().all()]
+
+    async def list_logs(
+        self,
+        offset: int = 0,
+        limit: int = 100,
+        request_type: LLMRequestType | None = None,
+        fallback_only: bool = False,
+    ) -> list[LLMLogEntry]:
+        query = select(LLMLogModel).order_by(LLMLogModel.created_at.desc())
+        if request_type is not None:
+            query = query.where(LLMLogModel.request_type == request_type.value)
+        if fallback_only:
+            query = query.where(LLMLogModel.is_fallback.is_(True))
+
+        result = await self.session.execute(query.offset(offset).limit(limit))
+        return [LLMLogMapper.model_to_domain(model) for model in result.scalars().all()]
+
+    async def count_logs(
+        self,
+        request_type: LLMRequestType | None = None,
+        fallback_only: bool = False,
+    ) -> int:
+        query = select(func.count(LLMLogModel.id))
+        if request_type is not None:
+            query = query.where(LLMLogModel.request_type == request_type.value)
+        if fallback_only:
+            query = query.where(LLMLogModel.is_fallback.is_(True))
+
+        return int(await self.session.scalar(query) or 0)
+
+    async def get_average_latency(self) -> float | None:
+        value = await self.session.scalar(
+            select(func.avg(LLMLogModel.latency_ms)).where(LLMLogModel.latency_ms.is_not(None))
+        )
+        return float(value) if value is not None else None
+
+    async def get_request_counts_by_type(self) -> dict[LLMRequestType, int]:
+        result = await self.session.execute(
+            select(LLMLogModel.request_type, func.count(LLMLogModel.id)).group_by(LLMLogModel.request_type)
+        )
+        return {
+            LLMRequestType(request_type): count
+            for request_type, count in result.all()
+        }

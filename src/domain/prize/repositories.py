@@ -40,6 +40,11 @@ class PrizeRepository(ABC):
         Useful for: showing prize catalog, random selection.
         """
         pass
+
+    @abstractmethod
+    async def get_all_prizes(self) -> list[Prize]:
+        """Get all prize definitions, including inactive ones."""
+        pass
     
     @abstractmethod
     async def delete(self, prize_id: UUID) -> None:

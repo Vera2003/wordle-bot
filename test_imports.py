@@ -22,7 +22,7 @@ except Exception as e:
     print(f"❌ Path: {e}")
 
 try:
-    from src.app.core.config import get_settings
+    from src.core.config import get_settings
     get_settings.cache_clear()
     # from pytest import MonkeyPatch
     # monkeypatch.setenv("POSTGRES_DB", "test_db")

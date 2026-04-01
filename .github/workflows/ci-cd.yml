@@ -31,20 +31,16 @@ jobs:
         with:
           python-version: "3.12"
 
-      - name: Install Poetry
-        run: pip install poetry==1.8.2
-
-      - name: Cache Poetry dependencies
-        uses: actions/cache@v4
+      - name: Set up uv
+        uses: astral-sh/setup-uv@v6
         with:
-          path: ~/.cache/pypoetry
-          key: poetry-${{ hashFiles('poetry.lock') }}
+          enable-cache: true
 
       - name: Install dependencies
-        run: poetry install --with dev
+        run: uv sync --all-groups
 
       - name: Run tests
-        run: poetry run pytest -v --tb=short
+        run: uv run pytest -v --tb=short
         env:
           ENVIRONMENT: testing
           BOT_TOKEN: test_token

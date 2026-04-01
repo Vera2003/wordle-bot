@@ -29,6 +29,7 @@ class UserRepositoryImpl(UserRepository):
             existing.full_name = model_data.full_name
             existing.energy = model_data.energy
             existing.total_points = model_data.total_points
+            existing.last_energy_reset = model_data.last_energy_reset
             existing.updated_at = model_data.updated_at
         else:
             # Create new model from domain entity

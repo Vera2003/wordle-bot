@@ -101,3 +101,37 @@ class DeactivateGeneHandler:
         gene.deactivate()
         await self.gene_repository.save(gene)
         return _to_gene_output(gene)
+
+
+class UpdateGeneCommand(BaseModel):
+    """Command to update editable gene fields."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    gene_id: UUID
+    description: str | None = None
+    hint: str | None = None
+    difficulty: str | None = Field(default=None, pattern="^(easy|medium|hard)$")
+
+
+class UpdateGeneHandler:
+    """Handler for updating an existing gene."""
+
+    def __init__(self, gene_repository: GeneRepository):
+        self.gene_repository = gene_repository
+
+    async def __call__(self, command: UpdateGeneCommand) -> GeneOutput:
+        gene = await self.gene_repository.get_by_id(command.gene_id)
+        if not gene:
+            raise GeneNotFoundError(f"Gene {command.gene_id} not found")
+
+        if command.description is None and command.hint is None and command.difficulty is None:
+            raise ValueError("At least one field must be provided for update")
+
+        gene.update_details(
+            description=command.description,
+            hint=command.hint,
+            difficulty=GeneDifficulty(command.difficulty) if command.difficulty is not None else None,
+        )
+        await self.gene_repository.save(gene)
+        return _to_gene_output(gene)

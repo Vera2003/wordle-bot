@@ -90,3 +90,33 @@ class LLMLogRepository(ABC):
         Useful for: analytics, cost reporting
         """
         pass
+
+    @abstractmethod
+    async def list_logs(
+        self,
+        offset: int = 0,
+        limit: int = 100,
+        request_type: LLMRequestType | None = None,
+        fallback_only: bool = False,
+    ) -> list[LLMLogEntry]:
+        """Get logs with optional filters and pagination."""
+        pass
+
+    @abstractmethod
+    async def count_logs(
+        self,
+        request_type: LLMRequestType | None = None,
+        fallback_only: bool = False,
+    ) -> int:
+        """Count logs with optional filters."""
+        pass
+
+    @abstractmethod
+    async def get_average_latency(self) -> float | None:
+        """Get average latency across logs with a measured duration."""
+        pass
+
+    @abstractmethod
+    async def get_request_counts_by_type(self) -> dict[LLMRequestType, int]:
+        """Aggregate request counts grouped by request type."""
+        pass

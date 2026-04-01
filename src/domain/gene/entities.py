@@ -90,6 +90,27 @@ class Gene:
     def activate(self) -> None:
         """Activate this gene (can be used in games again)."""
         self._is_active = True
+
+    def update_details(
+        self,
+        *,
+        description: str | None = None,
+        hint: str | None = None,
+        difficulty: GeneDifficulty | None = None,
+    ) -> None:
+        """Update editable gene attributes while preserving invariants."""
+        if description is not None:
+            if not description or not isinstance(description, str):
+                raise ValueError("Description must be a non-empty string")
+            self._description = description
+
+        if hint is not None:
+            if not hint or not isinstance(hint, str):
+                raise ValueError("Hint must be a non-empty string")
+            self._hint = hint
+
+        if difficulty is not None:
+            self._difficulty = difficulty
     
     def can_be_used(self) -> bool:
         """Check if this gene can be used for a new game."""

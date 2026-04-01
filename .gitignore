@@ -26,8 +26,8 @@ env/
 ENV/
 .venv
 
-# Poetry
-# poetry.lock
+# Lockfiles
+# uv.lock is tracked in git
 
 # Environment variables
 .env

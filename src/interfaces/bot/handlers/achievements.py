@@ -1,0 +1,93 @@
+"""
+Хендлеры достижений и статистики.
+
+Исправления:
+- Дублирующийся блок isinstance(event, CallbackQuery) заменён на однострочник
+- user: User | None инжектируется через UserMiddleware (нет повторного fetch)
+"""
+from aiogram import F, Router
+from aiogram.types import CallbackQuery, Message
+from sqlalchemy.ext.asyncio import AsyncSession
+
+from src.interfaces.bot.legacy_facade import BotUser, get_user_energy, get_user_stats
+from ..keyboards.menu import get_main_menu_keyboard
+from ..texts.messages import ACHIEVEMENTS_MESSAGE, STATS_MESSAGE
+
+router = Router()
+
+
+def _get_message(event: Message | CallbackQuery) -> Message | None:
+    if isinstance(event, CallbackQuery):
+        return event.message if isinstance(event.message, Message) else None
+    return event
+
+
+@router.message(F.text == "📊 Статистика")
+@router.callback_query(F.data == "menu:stats")
+async def show_stats(
+    event: Message | CallbackQuery,
+    db: AsyncSession,
+    redis,
+    user: BotUser | None = None,
+):
+    message = _get_message(event)
+    if not message:
+        return
+    
+    if not user:
+        await message.answer("❌ Используйте /start")
+        return
+
+    stats = await get_user_stats(db, user.telegram_id)
+    energy = await get_user_energy(db, redis, user.id)
+
+    text = STATS_MESSAGE.format(
+        total_games=stats["total_games"],
+        won_games=stats["won_games"],
+        lost_games=stats["lost_games"],
+        win_rate=stats["win_rate"],
+        total_points=stats["total_points"],
+        energy=energy,
+        achievements_text="🏆 Достижений пока нет",
+    )
+
+    if isinstance(event, CallbackQuery):
+        message = _get_message(event)
+        if not message:
+            await event.answer()
+            return
+        await message.answer(text, reply_markup=get_main_menu_keyboard())  # answer, не edit_text
+        await event.answer()
+    else:
+        await event.answer(text, reply_markup=get_main_menu_keyboard())
+
+
+@router.message(F.text == "🏆 Мои достижения")
+@router.callback_query(F.data == "menu:achievements")
+async def show_achievements(
+    event: Message | CallbackQuery,
+    db: AsyncSession,
+    user: BotUser | None = None,
+):
+    message = _get_message(event)
+    if not message:
+        return
+    if not user:
+        await message.answer("❌ Используйте /start")
+        return
+
+    # TODO: реализовать полную систему достижений
+    text = ACHIEVEMENTS_MESSAGE.format(
+        achievements_list="Пока нет достижений",
+        next_achievement_text="Следующее: 🥈 Серебро (5 побед)",
+    )
+
+    if isinstance(event, CallbackQuery):
+        message = _get_message(event)
+        if not message:
+            await event.answer()
+            return
+        await message.answer(text, reply_markup=get_main_menu_keyboard())  # answer, не edit_text
+        await event.answer()
+    else:
+        await event.answer(text, reply_markup=get_main_menu_keyboard())

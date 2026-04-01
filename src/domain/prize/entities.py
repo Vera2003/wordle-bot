@@ -89,6 +89,21 @@ class Prize:
     def activate(self) -> None:
         """Allow this prize to be awarded again."""
         self._is_active = True
+
+    def update_details(
+        self,
+        *,
+        description: str | None = None,
+        value: PrizeValue | None = None,
+    ) -> None:
+        """Update editable prize attributes."""
+        if description is not None:
+            if not description or not isinstance(description, str):
+                raise ValueError("Prize description must be non-empty string")
+            self._description = description
+
+        if value is not None:
+            self._value = value
     
     def __repr__(self) -> str:
         return f"Prize(id={self._id}, name={self._name}, is_active={self._is_active})"

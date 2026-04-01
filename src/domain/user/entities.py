@@ -29,6 +29,7 @@ class User:
         full_name: Optional[str] = None,
         energy: Optional[Energy] = None,
         total_points: int = 0,
+        last_energy_reset: Optional[datetime] = None,
         created_at: Optional[datetime] = None,
         updated_at: Optional[datetime] = None,
     ):
@@ -42,6 +43,7 @@ class User:
         self._energy = energy or Energy(5)  # Default: 5 energy
         self._total_points = total_points
         self.created_at = created_at or datetime.now()
+        self.last_energy_reset = last_energy_reset or self.created_at
         self.updated_at = updated_at or datetime.now()
     
     @property
@@ -63,6 +65,10 @@ class User:
     @property
     def total_points(self) -> int:
         return self._total_points
+
+    @property
+    def max_energy(self) -> int:
+        return self._energy.max
     
     def add_points(self, points: int) -> None:
         """Add points to user's total."""
@@ -71,17 +77,30 @@ class User:
         self._total_points += points
         self.updated_at = datetime.now()
     
-    def use_energy(self) -> None:
-        """Use one energy point for a game."""
-        if self._energy.is_depleted():
+    def use_energy(self, amount: int = 1) -> None:
+        """Use one or more energy points."""
+        if amount < 1:
+            raise ValueError("Energy amount must be positive")
+        if self._energy.value < amount:
             raise ValueError("No energy left to play")
-        self._energy = self._energy.use_energy()
+
+        energy = self._energy
+        for _ in range(amount):
+            energy = energy.use_energy()
+        self._energy = energy
         self.updated_at = datetime.now()
     
-    def restore_energy(self) -> None:
+    def restore_energy(
+        self,
+        restored_at: Optional[datetime] = None,
+        max_energy: Optional[int] = None,
+    ) -> None:
         """Restore energy to maximum."""
-        self._energy = Energy(self._energy.max, self._energy.max)
-        self.updated_at = datetime.now()
+        target_max = max_energy or self._energy.max
+        now = restored_at or datetime.now()
+        self._energy = Energy(target_max, target_max)
+        self.last_energy_reset = now
+        self.updated_at = now
     
     def update_profile(
         self,

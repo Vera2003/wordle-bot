@@ -5,7 +5,7 @@
 """
 from datetime import date, datetime, timezone
 
-from src.app.utils.time_helpers import get_seconds_until_midnight, get_today_date, get_today_str
+from src.utils.time_helpers import get_seconds_until_midnight, get_today_date, get_today_str
 
 
 class TestGetSecondsUntilMidnight:

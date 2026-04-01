@@ -5,7 +5,7 @@ from uuid import UUID
 
 from pydantic import BaseModel, ConfigDict, Field
 
-from src.application.llm.dto import LLMLogOutput
+from src.application.llm.dto import LLMLogListOutput, LLMLogOutput, LLMStatsOutput
 from src.domain.llm import LLMLogEntry, LLMLogRepository, LLMRequestType, LLMService
 
 
@@ -148,3 +148,65 @@ class GetLLMLogsByDateRangeHandler:
             query.end_date,
         )
         return [_to_log_output(log_entry) for log_entry in logs]
+
+
+class GetLLMLogsQuery(BaseModel):
+    """Query to fetch llm logs with filters and pagination."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    skip: int = Field(default=0, ge=0)
+    limit: int = Field(default=100, ge=1, le=500)
+    request_type: LLMRequestType | None = None
+    fallback_only: bool = False
+
+
+class GetLLMLogsHandler:
+    """Handler for filtered llm log list query."""
+
+    def __init__(self, llm_log_repository: LLMLogRepository):
+        self.llm_log_repository = llm_log_repository
+
+    async def __call__(self, query: GetLLMLogsQuery) -> LLMLogListOutput:
+        total = await self.llm_log_repository.count_logs(
+            request_type=query.request_type,
+            fallback_only=query.fallback_only,
+        )
+        logs = await self.llm_log_repository.list_logs(
+            offset=query.skip,
+            limit=query.limit,
+            request_type=query.request_type,
+            fallback_only=query.fallback_only,
+        )
+        return LLMLogListOutput(
+            total=total,
+            items=[_to_log_output(log_entry) for log_entry in logs],
+        )
+
+
+class GetLLMStatsQuery(BaseModel):
+    """Query to fetch aggregated llm monitoring stats."""
+
+    model_config = ConfigDict(extra="forbid")
+
+
+class GetLLMStatsHandler:
+    """Handler for llm stats query."""
+
+    def __init__(self, llm_log_repository: LLMLogRepository):
+        self.llm_log_repository = llm_log_repository
+
+    async def __call__(self, query: GetLLMStatsQuery) -> LLMStatsOutput:
+        del query
+        total = await self.llm_log_repository.count_logs()
+        fallback_count = await self.llm_log_repository.count_logs(fallback_only=True)
+        avg_latency = await self.llm_log_repository.get_average_latency()
+        counts = await self.llm_log_repository.get_request_counts_by_type()
+
+        return LLMStatsOutput(
+            total_requests=total,
+            fallback_count=fallback_count,
+            fallback_rate=round(fallback_count / total * 100, 2) if total else 0.0,
+            avg_latency_ms=round(float(avg_latency), 1) if avg_latency is not None else None,
+            requests_by_type={request_type.value: count for request_type, count in counts.items()},
+        )

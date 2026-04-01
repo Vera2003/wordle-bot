@@ -1,11 +1,30 @@
 """LLM application layer module."""
 
-from .dto import LLMLogOutput
+from .commands import (
+    AskGeneticsQuestionCommand,
+    AskGeneticsQuestionHandler,
+    ChatHistoryItem,
+    GenerateGeneFactCommand,
+    GenerateGeneFactHandler,
+)
+from .dto import (
+    ChatAnswerOutput,
+    GeneFactOutput,
+    LLMCompletionOutput,
+    LLMLogListOutput,
+    LLMLogOutput,
+    LLMStatsOutput,
+)
+from .interfaces import LLMGenerationService
 from .queries import (
     GetFailedLLMLogsHandler,
     GetFailedLLMLogsQuery,
     GetLLMLogByIdHandler,
     GetLLMLogByIdQuery,
+    GetLLMLogsHandler,
+    GetLLMLogsQuery,
+    GetLLMStatsHandler,
+    GetLLMStatsQuery,
     GetLLMLogsByDateRangeHandler,
     GetLLMLogsByDateRangeQuery,
     GetLLMLogsByRequestTypeHandler,
@@ -17,9 +36,24 @@ from .queries import (
 )
 
 __all__ = [
+    "LLMGenerationService",
+    "LLMCompletionOutput",
+    "GeneFactOutput",
+    "ChatAnswerOutput",
     "LLMLogOutput",
+    "LLMLogListOutput",
+    "LLMStatsOutput",
+    "ChatHistoryItem",
+    "GenerateGeneFactCommand",
+    "GenerateGeneFactHandler",
+    "AskGeneticsQuestionCommand",
+    "AskGeneticsQuestionHandler",
     "GetLLMLogByIdHandler",
     "GetLLMLogByIdQuery",
+    "GetLLMLogsHandler",
+    "GetLLMLogsQuery",
+    "GetLLMStatsHandler",
+    "GetLLMStatsQuery",
     "GetUserLLMLogsHandler",
     "GetUserLLMLogsQuery",
     "GetFailedLLMLogsHandler",

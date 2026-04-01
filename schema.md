@@ -104,6 +104,6 @@ genetic-wordle-bot/
 ├── .pre-commit-config.yaml
 ├── alembic.ini
 ├── pyproject.toml
-├── poetry.lock
+├── uv.lock
 ├── README.md
-└── Taskfile.yaml                      # Task runner (аналог Makefile)
+└── Makefile

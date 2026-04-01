@@ -22,9 +22,9 @@ Telegram-бот для изучения генов через игру в сти
 - **Backend**: Python 3.12, FastAPI, Aiogram 3
 - **БД**: PostgreSQL 16, Redis 7
 - **ORM**: SQLAlchemy 2.0 (async)
-- **Dependency Management**: Poetry
+- **Dependency Management**: uv
 - **Контейнеризация**: Docker, Docker Compose
-- **Task Runner**: Taskfile
+- **Task Runner**: Makefile
 
 ## 🚀 Быстрый старт
 
@@ -32,17 +32,29 @@ Telegram-бот для изучения генов через игру в сти
 
 - Docker & Docker Compose
 - Python 3.12+ (для локальной разработки)
-- Poetry (опционально)
-- Task (опционально, но рекомендуется)
+- uv
+- make
 
-### Установка Task
+### Установка зависимостей
 
 ```bash
-# macOS
-brew install go-task
+make install
+```
 
-# Linux
-sh -c "$(curl --location https://taskfile.dev/install.sh)" -- -d -b /usr/local/bin
+### Основные команды
 
-# Windows (Chocolatey)
-choco install go-task
+```bash
+make docker-up
+make migrate
+make db-init
+make run-api
+# bot в отдельном терминале
+make run-bot
+```
+
+### Проверки
+
+```bash
+make lint
+make test
+```

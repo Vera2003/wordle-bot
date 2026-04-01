@@ -4,6 +4,7 @@ import pytest
 from httpx import AsyncClient, ASGITransport
 from sqlalchemy.ext.asyncio import create_async_engine, async_sessionmaker
 
+from src.core.config import get_settings
 from src.interfaces.main import create_app
 from src.infrastructure.db.base import Base
 
@@ -55,6 +56,7 @@ async def test_health_check(client):
 @pytest.mark.asyncio
 async def test_get_or_create_user(client):
     """Test getting or creating user."""
+    settings = get_settings()
     response = await client.post(
         "/api/v1/users/get-or-create?telegram_id=123&username=testuser&full_name=Test%20User"
     )
@@ -63,7 +65,7 @@ async def test_get_or_create_user(client):
     assert data["telegram_id"] == 123
     assert data["username"] == "testuser"
     assert data["full_name"] == "Test User"
-    assert data["energy"] == 5
+    assert data["energy"] == settings.daily_energy
     assert data["total_points"] == 0
 
 
@@ -142,6 +144,7 @@ async def test_use_energy(client):
 @pytest.mark.asyncio
 async def test_restore_energy(client):
     """Test restoring energy."""
+    settings = get_settings()
     # Create a user
     create_response = await client.post(
         "/api/v1/users/get-or-create?telegram_id=123&username=testuser"
@@ -155,4 +158,4 @@ async def test_restore_energy(client):
     response = await client.post(f"/api/v1/users/{user_id}/restore-energy")
     assert response.status_code == 200
     data = response.json()
-    assert data["current_energy"] == 5
+    assert data["current_energy"] == settings.daily_energy

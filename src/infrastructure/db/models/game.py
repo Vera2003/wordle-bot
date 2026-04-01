@@ -1,79 +1,79 @@
-"""SQLAlchemy models for Game aggregate."""
+"""Game ORM model."""
 
 from datetime import datetime
-from typing import TYPE_CHECKING, List, Optional
+import uuid
+from typing import List, Optional
 
-from sqlalchemy import Column, Integer, String, DateTime, ForeignKey, Boolean, JSON, func, BigInteger
+from sqlalchemy import Boolean, DateTime, ForeignKey, Integer, JSON, String, func
 from sqlalchemy.orm import Mapped, mapped_column, relationship
-from uuid import UUID
+from sqlalchemy.types import TypeDecorator
 
 from ..base import Base
 
-if TYPE_CHECKING:
-    from .user import User
+
+class UUIDString(TypeDecorator[str]):
+    """String-backed UUID column that accepts either UUID or string input."""
+
+    impl = String(36)
+    cache_ok = True
+
+    def process_bind_param(self, value: str | uuid.UUID | None, dialect) -> str | None:
+        del dialect
+        if value is None:
+            return None
+        if isinstance(value, uuid.UUID):
+            return str(value)
+        return str(value)
+
+    def process_result_value(self, value: str | None, dialect) -> str | None:
+        del dialect
+        return value
 
 
 class GameSessionModel(Base):
-    """ORM Model: GameSession table"""
-    
+    """ORM Model: game_sessions table."""
+
     __tablename__ = "game_sessions"
-    
-    id: Mapped[int] = mapped_column(BigInteger, primary_key=True)
-    user_id: Mapped[int] = mapped_column(BigInteger, ForeignKey("users.id", ondelete="CASCADE"))
-    gene_id: Mapped[Optional[int]] = mapped_column(Integer, ForeignKey("genes.id"), nullable=True)
-    
-    # Game state
-    target_word: Mapped[str] = mapped_column(String(50), nullable=False)
+
+    id: Mapped[str] = mapped_column(UUIDString(), primary_key=True, default=lambda: str(uuid.uuid4()))
+    user_id: Mapped[str] = mapped_column(UUIDString(), ForeignKey("users.id"), nullable=False)
+    word: Mapped[str] = mapped_column(String(50), nullable=False)
     max_attempts: Mapped[int] = mapped_column(Integer, default=6)
     attempts_count: Mapped[int] = mapped_column(Integer, default=0)
     is_won: Mapped[bool] = mapped_column(Boolean, default=False)
     is_finished: Mapped[bool] = mapped_column(Boolean, default=False)
     hint_used: Mapped[bool] = mapped_column(Boolean, default=False)
     points_earned: Mapped[int] = mapped_column(Integer, default=0)
-    
-    # Timestamps
+
     created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
     finished_at: Mapped[Optional[datetime]] = mapped_column(DateTime, nullable=True)
-    
-    # Relationships
+
     attempts_history: Mapped[List["GameAttemptModel"]] = relationship(
         "GameAttemptModel",
         back_populates="session",
-        cascade="all, delete-orphan"
+        cascade="all, delete-orphan",
     )
-    
-    def __repr__(self) -> str:
-        return (
-            f"<GameSessionModel(id={self.id}, user_id={self.user_id}, "
-            f"is_won={self.is_won})>"
-        )
 
 
 class GameAttemptModel(Base):
-    """ORM Model: GameAttempt table"""
-    
+    """ORM Model: game_attempts table."""
+
     __tablename__ = "game_attempts"
-    
-    id: Mapped[int] = mapped_column(BigInteger, primary_key=True)
-    session_id: Mapped[int] = mapped_column(
-        BigInteger,
-        ForeignKey("game_sessions.id", ondelete="CASCADE")
+
+    id: Mapped[str] = mapped_column(UUIDString(), primary_key=True, default=lambda: str(uuid.uuid4()))
+    session_id: Mapped[str] = mapped_column(
+        UUIDString(),
+        ForeignKey("game_sessions.id", ondelete="CASCADE"),
+        nullable=False,
     )
-    
+
     attempt_number: Mapped[int] = mapped_column(Integer, nullable=False)
     guess_word: Mapped[str] = mapped_column(String(50), nullable=False)
     result: Mapped[dict] = mapped_column(JSON, nullable=False)
-    
+
     created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
-    
-    # Relationships
+
     session: Mapped["GameSessionModel"] = relationship(
         "GameSessionModel",
-        back_populates="attempts_history"
+        back_populates="attempts_history",
     )
-    
-    def __repr__(self) -> str:
-        return (
-            f"<GameAttemptModel(id={self.id}, session_id={self.session_id}, "
-            f"attempt={self.attempt_number})>"
-        )

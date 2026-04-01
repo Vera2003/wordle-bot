@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from typing import List, Optional
+from typing import List, Literal, Optional
 from datetime import datetime
 from uuid import UUID
 import uuid
@@ -175,10 +175,10 @@ class GameSession:
         guess_str = guess.value
         
         letters: List[LetterStatus] = []
-        target_chars = list(target)
+        target_chars: List[str | None] = list(target)
         
         # First pass: mark correct positions
-        status_map = ["unknown"] * len(guess_str)
+        status_map: List[Literal["unknown", "correct", "present", "absent"]] = ["unknown"] * len(guess_str)
         for i, char in enumerate(guess_str):
             if char == target[i]:
                 status_map[i] = "correct"
@@ -196,6 +196,8 @@ class GameSession:
         # Create LetterStatus objects
         for i, char in enumerate(guess_str):
             status = status_map[i]
+            if status == "unknown":
+                status = "absent"
             letters.append(LetterStatus(char, status))
         
         return GuessResult(letters)
@@ -208,6 +210,15 @@ class GameSession:
             return False
         self.hint_used = True
         return True
+
+    def surrender(self, finished_at: Optional[datetime] = None) -> None:
+        """Finish the game as a loss without awarding points."""
+        if self._is_finished:
+            return
+        self._is_finished = True
+        self._is_won = False
+        self.finished_at = finished_at or datetime.utcnow()
+        self.points_earned = 0
     
     def is_over(self) -> bool:
         """Game is over (won or lost)."""

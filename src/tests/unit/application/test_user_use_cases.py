@@ -4,6 +4,7 @@ import pytest
 from unittest.mock import AsyncMock, MagicMock
 from uuid import uuid4
 
+from src.core.config import get_settings
 from src.domain.user import User, TelegramId, Username, Energy, UserNotFoundError
 from src.application.user.commands import (
     GetOrCreateUserHandler,
@@ -55,6 +56,7 @@ class TestGetOrCreateUserHandler:
     @pytest.mark.asyncio
     async def test_create_new_user(self):
         """Test creating new user."""
+        settings = get_settings()
         repository = AsyncMock()
         repository.get_by_telegram_id.return_value = None
         repository.save = AsyncMock()
@@ -72,7 +74,7 @@ class TestGetOrCreateUserHandler:
         assert result.username == "jane"
         assert result.full_name == "Jane Doe"
         assert result.is_new is True
-        assert result.energy == 5
+        assert result.energy == settings.daily_energy
         repository.save.assert_called_once()
 
 

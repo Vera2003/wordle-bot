@@ -16,7 +16,10 @@ class LLMModel(str, Enum):
     """Supported LLM models."""
     
     YANDEX_GPT = "yandex_gpt"
-    # Can extend with other models (OpenAI, Claude, etc.)
+    GPT_4O_MINI = "gpt-4o-mini"
+    GPT_4O = "gpt-4o"
+    GPT_4_TURBO = "gpt-4-turbo"
+    PROXYAPI = "proxyapi"
 
 
 class LLMPrompt:

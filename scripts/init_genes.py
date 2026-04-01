@@ -2,11 +2,11 @@
 Полная инициализация базы данных.
 
 Запуск:
-    poetry run python scripts/init_genes.py
+    uv run python scripts/init_genes.py
+    # или через Makefile:
+    make db-init
     # или внутри контейнера:
-    docker-compose exec api python scripts/init_genes.py
-    # или через Taskfile:
-    task db-init
+    docker compose exec api uv run python scripts/init_genes.py
 """
 import asyncio
 import sys
@@ -19,13 +19,13 @@ from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine
 root = Path(__file__).parent.parent
 sys.path.insert(0, str(root))
 
-from src.app.core.config import get_settings
-from src.app.db.base import Base
-from src.app.db.models.achievements import AchievementType, UserAchievement  # noqa: F401
-from src.app.db.models.game import GameAttempt, GameSession  # noqa: F401
-from src.app.db.models.gene import Gene
-from src.app.db.models.prize import PrizeType, UserPrize  # noqa: F401
-from src.app.db.models.user import User  # noqa: F401
+from src.core.config import get_settings
+from src.infrastructure.db.base import Base
+from src.infrastructure.db.models.achievement import AchievementTypeModel, UserAchievementModel  # noqa: F401
+from src.infrastructure.db.models.game import GameAttemptModel, GameSessionModel  # noqa: F401
+from src.infrastructure.db.models.gene import GeneModel
+from src.infrastructure.db.models.prize import PrizeModel, UserPrizeModel  # noqa: F401
+from src.infrastructure.db.models.user import UserModel  # noqa: F401
 
 
 # ============================================================================
@@ -214,9 +214,9 @@ async def init_database() -> bool:
             print("\n🧬 Гены:")
             genes_added = 0
             for gene in GENES_DATA:
-                exists = await session.scalar(select(Gene).where(Gene.name == gene["name"]))
+                exists = await session.scalar(select(GeneModel).where(GeneModel.name == gene["name"]))
                 if not exists:
-                    session.add(Gene(**gene, is_active=True))
+                    session.add(GeneModel(**gene, is_active=True))
                     genes_added += 1
                     print(f"   ✓ {gene['name']:8} [{gene['difficulty']}]")
             await session.commit()
@@ -227,10 +227,10 @@ async def init_database() -> bool:
             ach_added = 0
             for ach in ACHIEVEMENT_TYPES:
                 exists = await session.scalar(
-                    select(AchievementType).where(AchievementType.name == ach["name"])
+                    select(AchievementTypeModel).where(AchievementTypeModel.name == ach["name"])
                 )
                 if not exists:
-                    session.add(AchievementType(**ach))
+                    session.add(AchievementTypeModel(**ach))
                     ach_added += 1
                     print(f"   ✓ {ach['title']}")
             await session.commit()
@@ -241,10 +241,10 @@ async def init_database() -> bool:
             prizes_added = 0
             for prize in PRIZE_TYPES:
                 exists = await session.scalar(
-                    select(PrizeType).where(PrizeType.name == prize["name"])
+                    select(PrizeModel).where(PrizeModel.name == prize["name"])
                 )
                 if not exists:
-                    session.add(PrizeType(**prize))
+                    session.add(PrizeModel(**prize))
                     prizes_added += 1
                     print(f"   ✓ {prize['title']}")
             await session.commit()

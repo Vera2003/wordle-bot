@@ -46,6 +46,12 @@ class PrizeRepositoryImpl(PrizeRepository):
         )
         return [PrizeMapper.model_to_domain(model) for model in result.scalars().all()]
 
+    async def get_all_prizes(self) -> list[Prize]:
+        result = await self.session.execute(
+            select(PrizeModel).order_by(PrizeModel.name.asc())
+        )
+        return [PrizeMapper.model_to_domain(model) for model in result.scalars().all()]
+
     async def delete(self, prize_id: UUID) -> None:
         model = await self.session.get(PrizeModel, prize_id)
         if model:

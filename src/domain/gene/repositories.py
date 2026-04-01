@@ -34,6 +34,11 @@ class GeneRepository(ABC):
     async def get_active_genes(self) -> list[Gene]:
         """Get all active genes (can be used in games)."""
         pass
+
+    @abstractmethod
+    async def get_all_genes(self) -> list[Gene]:
+        """Get all genes for admin and maintenance flows."""
+        pass
     
     @abstractmethod
     async def get_random_active(self) -> Optional[Gene]:
