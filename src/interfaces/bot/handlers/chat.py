@@ -5,18 +5,18 @@
 задаёт вопросы свободным текстом, история сохраняется в FSM.
 Выход — кнопка "◀️ Выйти из чата" или команда /start.
 """
+
+from typing import cast
+
 import structlog
 from aiogram import F, Router
 from aiogram.fsm.context import FSMContext
-from aiogram.types import (
-    KeyboardButton,
-    Message,
-    ReplyKeyboardMarkup,
-)
+from aiogram.types import KeyboardButton, Message, ReplyKeyboardMarkup
 from aiogram.utils.keyboard import ReplyKeyboardBuilder
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.interfaces.bot.legacy_facade import BotUser, answer_genetics_question
+
 from ..states.game import ChatStates
 from ..texts.messages import MAIN_MENU_MESSAGE
 
@@ -35,6 +35,7 @@ def _get_chat_keyboard() -> ReplyKeyboardMarkup:
 # ---------------------------------------------------------------------------
 # Вход в чат-режим
 # ---------------------------------------------------------------------------
+
 
 @router.message(F.text == "🤖 Спросить ИИ")
 async def enter_chat_mode(
@@ -66,9 +67,11 @@ async def enter_chat_mode(
 # Выход из чат-режима
 # ---------------------------------------------------------------------------
 
+
 @router.message(F.text == "◀️ Выйти из чата", ChatStates.chatting)
 async def exit_chat_mode(message: Message, state: FSMContext):
     from ..keyboards.menu import get_main_menu_keyboard
+
     await state.clear()
     await message.answer(MAIN_MENU_MESSAGE, reply_markup=get_main_menu_keyboard())
 
@@ -76,6 +79,7 @@ async def exit_chat_mode(message: Message, state: FSMContext):
 # ---------------------------------------------------------------------------
 # Обработка вопроса
 # ---------------------------------------------------------------------------
+
 
 @router.message(ChatStates.chatting, F.text)
 async def handle_chat_message(
@@ -96,7 +100,7 @@ async def handle_chat_message(
     )
 
     data = await state.get_data()
-    history: list[dict] = data.get("chat_history", [])
+    history = cast(list[dict[str, str]], data.get("chat_history", []))
 
     answer = await answer_genetics_question(db, user.id, question, history)
 

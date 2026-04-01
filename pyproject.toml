@@ -22,15 +22,18 @@ dependencies = [
 ]
 
 [dependency-groups]
-dev = [
+lint = [
     "black>=24.1.1,<25",
     "isort>=5.13.2,<6",
-    "pytest>=8.0.0,<9",
     "flake8>=7.3.0,<8",
     "mypy>=1.19.1,<2",
+]
+test = [
+    "pytest>=8.0.0,<9",
     "pytest-asyncio>=1.3.0,<2",
     "aiosqlite>=0.22.1,<1",
 ]
+dev = []
 
 [build-system]
 requires = ["hatchling"]
@@ -38,3 +41,11 @@ build-backend = "hatchling.build"
 
 [tool.hatch.build.targets.wheel]
 packages = ["src"]
+
+[tool.isort]
+profile = "black"
+line_length = 88
+
+[tool.mypy]
+python_version = "3.14"
+disable_error_code = ["no-untyped-def"]

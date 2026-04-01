@@ -1,12 +1,12 @@
 """User application layer module."""
 
 from .dto import (
-    UserProfileOutput,
     AddPointsInput,
     AddPointsOutput,
+    RestoreEnergyOutput,
     UseEnergyInput,
     UseEnergyOutput,
-    RestoreEnergyOutput,
+    UserProfileOutput,
 )
 
 __all__ = [

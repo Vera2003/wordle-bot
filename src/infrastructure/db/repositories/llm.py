@@ -86,7 +86,9 @@ class LLMLogRepositoryImpl(LLMLogRepository):
     ) -> list[LLMLogEntry]:
         result = await self.session.execute(
             select(LLMLogModel)
-            .where(LLMLogModel.created_at >= start_date, LLMLogModel.created_at <= end_date)
+            .where(
+                LLMLogModel.created_at >= start_date, LLMLogModel.created_at <= end_date
+            )
             .order_by(LLMLogModel.created_at.desc())
         )
         return [LLMLogMapper.model_to_domain(model) for model in result.scalars().all()]
@@ -122,15 +124,18 @@ class LLMLogRepositoryImpl(LLMLogRepository):
 
     async def get_average_latency(self) -> float | None:
         value = await self.session.scalar(
-            select(func.avg(LLMLogModel.latency_ms)).where(LLMLogModel.latency_ms.is_not(None))
+            select(func.avg(LLMLogModel.latency_ms)).where(
+                LLMLogModel.latency_ms.is_not(None)
+            )
         )
         return float(value) if value is not None else None
 
     async def get_request_counts_by_type(self) -> dict[LLMRequestType, int]:
         result = await self.session.execute(
-            select(LLMLogModel.request_type, func.count(LLMLogModel.id)).group_by(LLMLogModel.request_type)
+            select(LLMLogModel.request_type, func.count(LLMLogModel.id)).group_by(
+                LLMLogModel.request_type
+            )
         )
         return {
-            LLMRequestType(request_type): count
-            for request_type, count in result.all()
+            LLMRequestType(request_type): count for request_type, count in result.all()
         }

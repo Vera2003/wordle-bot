@@ -7,6 +7,7 @@
 - Добавлено редактирование генов (FSM: AdminStates.editing_gene)
 - Добавлено управление призами (просмотр, активация/деактивация)
 """
+
 from aiogram import F, Router
 from aiogram.filters import Command
 from aiogram.fsm.context import FSMContext
@@ -18,6 +19,7 @@ from aiogram.types import (
 )
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from src.infrastructure.config.settings import get_settings
 from src.interfaces.bot.legacy_facade import (
     create_gene,
     gene_exists,
@@ -26,18 +28,21 @@ from src.interfaces.bot.legacy_facade import (
     get_prize,
     list_genes,
     list_prizes,
-    toggle_gene_active as facade_toggle_gene_active,
-    toggle_prize_active as facade_toggle_prize_active,
-    update_gene_field,
-    update_prize_field,
 )
+from src.interfaces.bot.legacy_facade import (
+    toggle_gene_active as facade_toggle_gene_active,
+)
+from src.interfaces.bot.legacy_facade import (
+    toggle_prize_active as facade_toggle_prize_active,
+)
+from src.interfaces.bot.legacy_facade import update_gene_field, update_prize_field
+
 from ..keyboards.menu import (
     get_admin_keyboard,
     get_cancel_keyboard,
     get_main_menu_keyboard,
 )
 from ..states.game import AdminStates
-from src.core.config import get_settings
 
 router = Router()
 
@@ -50,6 +55,7 @@ def is_admin(user_id: int) -> bool:
 # ============================================================================
 # ВХОД В ПАНЕЛЬ
 # ============================================================================
+
 
 @router.message(Command("admin"))
 async def cmd_admin(message: Message, state: FSMContext):
@@ -76,6 +82,7 @@ async def back_to_menu(message: Message, state: FSMContext):
 # СТАТИСТИКА
 # ============================================================================
 
+
 @router.message(F.text == "📊 Статистика всех игроков", AdminStates.admin_menu)
 async def show_global_stats(message: Message, db: AsyncSession):
     if message.from_user is None:
@@ -85,10 +92,13 @@ async def show_global_stats(message: Message, db: AsyncSession):
 
     stats = await get_global_stats(db)
 
-    top_text = "\n".join(
-        f"{i + 1}. {p['name']}: {p['points']}🏆"
-        for i, p in enumerate(stats["top_players"][:3])
-    ) or "Нет данных"
+    top_text = (
+        "\n".join(
+            f"{i + 1}. {p['name']}: {p['points']}🏆"
+            for i, p in enumerate(stats["top_players"][:3])
+        )
+        or "Нет данных"
+    )
 
     await message.answer(
         f"📊 <b>Глобальная статистика</b>\n\n"
@@ -104,6 +114,7 @@ async def show_global_stats(message: Message, db: AsyncSession):
 # ============================================================================
 # ДОБАВЛЕНИЕ ГЕНА
 # ============================================================================
+
 
 @router.message(F.text == "➕ Добавить ген", AdminStates.admin_menu)
 async def add_gene_start(message: Message, state: FSMContext):
@@ -149,7 +160,9 @@ async def process_adding_gene(message: Message, state: FSMContext, db: AsyncSess
             )
             return
         if await gene_exists(db, name):
-            await message.answer(f"❌ Ген <b>{name}</b> уже существует!\nВведите другое название:")
+            await message.answer(
+                f"❌ Ген <b>{name}</b> уже существует!\nВведите другое название:"
+            )
             return
         await state.update_data(name=name, step="description")
         await message.answer(f"✅ Название: <b>{name}</b>\n\nВведите описание гена:")
@@ -157,7 +170,9 @@ async def process_adding_gene(message: Message, state: FSMContext, db: AsyncSess
     elif step == "description":
         description = message.text.strip()
         if len(description) < 20:
-            await message.answer("❌ Описание слишком короткое (минимум 20 символов).\nПопробуйте ещё раз:")
+            await message.answer(
+                "❌ Описание слишком короткое (минимум 20 символов).\nПопробуйте ещё раз:"
+            )
             return
         await state.update_data(description=description, step="hint")
         await message.answer("✅ Описание сохранено\n\nВведите подсказку для игроков:")
@@ -165,15 +180,21 @@ async def process_adding_gene(message: Message, state: FSMContext, db: AsyncSess
     elif step == "hint":
         hint = message.text.strip()
         if len(hint) < 10:
-            await message.answer("❌ Подсказка слишком короткая (минимум 10 символов).\nПопробуйте ещё раз:")
+            await message.answer(
+                "❌ Подсказка слишком короткая (минимум 10 символов).\nПопробуйте ещё раз:"
+            )
             return
         await state.update_data(hint=hint, step="difficulty")
-        await message.answer("✅ Подсказка сохранена\n\nВыберите сложность (easy/medium/hard):")
+        await message.answer(
+            "✅ Подсказка сохранена\n\nВыберите сложность (easy/medium/hard):"
+        )
 
     elif step == "difficulty":
         difficulty = message.text.strip().lower()
         if difficulty not in ("easy", "medium", "hard"):
-            await message.answer("❌ Неверная сложность. Выберите: easy, medium или hard")
+            await message.answer(
+                "❌ Неверная сложность. Выберите: easy, medium или hard"
+            )
             return
         data = await state.get_data()
         gene = await create_gene(
@@ -196,6 +217,7 @@ async def process_adding_gene(message: Message, state: FSMContext, db: AsyncSess
 # РЕДАКТИРОВАНИЕ ГЕНА
 # ============================================================================
 
+
 @router.message(F.text == "📝 Редактировать ген", AdminStates.admin_menu)
 async def list_genes_for_edit(message: Message, state: FSMContext, db: AsyncSession):
     if message.from_user is None:
@@ -211,10 +233,12 @@ async def list_genes_for_edit(message: Message, state: FSMContext, db: AsyncSess
 
     # Inline-кнопки с каждым геном
     buttons = [
-        [InlineKeyboardButton(
-            text=f"{'✅' if g.is_active else '❌'} {g.name} [{g.difficulty}]",
-            callback_data=f"admin:edit_gene:{g.id}"
-        )]
+        [
+            InlineKeyboardButton(
+                text=f"{'✅' if g.is_active else '❌'} {g.name} [{g.difficulty}]",
+                callback_data=f"admin:edit_gene:{g.id}",
+            )
+        ]
         for g in genes
     ]
     keyboard = InlineKeyboardMarkup(inline_keyboard=buttons)
@@ -240,13 +264,38 @@ async def show_gene_edit_menu(callback: CallbackQuery, db: AsyncSession):
     status = "✅ Активен" if gene.is_active else "❌ Деактивирован"
     toggle_text = "❌ Деактивировать" if gene.is_active else "✅ Активировать"
 
-    keyboard = InlineKeyboardMarkup(inline_keyboard=[
-        [InlineKeyboardButton(text="✏️ Изменить описание", callback_data=f"admin:gene_field:description:{gene_id}")],
-        [InlineKeyboardButton(text="💡 Изменить подсказку",  callback_data=f"admin:gene_field:hint:{gene_id}")],
-        [InlineKeyboardButton(text="📊 Изменить сложность", callback_data=f"admin:gene_field:difficulty:{gene_id}")],
-        [InlineKeyboardButton(text=toggle_text, callback_data=f"admin:gene_toggle:{gene_id}")],
-        [InlineKeyboardButton(text="◀️ Назад к списку", callback_data="admin:back_to_genes")],
-    ])
+    keyboard = InlineKeyboardMarkup(
+        inline_keyboard=[
+            [
+                InlineKeyboardButton(
+                    text="✏️ Изменить описание",
+                    callback_data=f"admin:gene_field:description:{gene_id}",
+                )
+            ],
+            [
+                InlineKeyboardButton(
+                    text="💡 Изменить подсказку",
+                    callback_data=f"admin:gene_field:hint:{gene_id}",
+                )
+            ],
+            [
+                InlineKeyboardButton(
+                    text="📊 Изменить сложность",
+                    callback_data=f"admin:gene_field:difficulty:{gene_id}",
+                )
+            ],
+            [
+                InlineKeyboardButton(
+                    text=toggle_text, callback_data=f"admin:gene_toggle:{gene_id}"
+                )
+            ],
+            [
+                InlineKeyboardButton(
+                    text="◀️ Назад к списку", callback_data="admin:back_to_genes"
+                )
+            ],
+        ]
+    )
 
     text = (
         f"🧬 <b>Ген {gene.name}</b>\n\n"
@@ -266,10 +315,12 @@ async def back_to_genes(callback: CallbackQuery, db: AsyncSession):
     genes = await list_genes(db)
 
     buttons = [
-        [InlineKeyboardButton(
-            text=f"{'✅' if g.is_active else '❌'} {g.name} [{g.difficulty}]",
-            callback_data=f"admin:edit_gene:{g.id}"
-        )]
+        [
+            InlineKeyboardButton(
+                text=f"{'✅' if g.is_active else '❌'} {g.name} [{g.difficulty}]",
+                callback_data=f"admin:edit_gene:{g.id}",
+            )
+        ]
         for g in genes
     ]
     keyboard = InlineKeyboardMarkup(inline_keyboard=buttons)
@@ -301,7 +352,9 @@ async def toggle_gene_active(callback: CallbackQuery, db: AsyncSession):
 
 
 @router.callback_query(F.data.startswith("admin:gene_field:"))
-async def start_edit_gene_field(callback: CallbackQuery, state: FSMContext, db: AsyncSession):
+async def start_edit_gene_field(
+    callback: CallbackQuery, state: FSMContext, db: AsyncSession
+):
     """Начать редактирование конкретного поля гена."""
     if not callback.data:
         await callback.answer("Неверные данные", show_alert=True)
@@ -336,11 +389,15 @@ async def start_edit_gene_field(callback: CallbackQuery, state: FSMContext, db: 
 @router.message(F.text == "❌ Отмена", AdminStates.editing_gene)
 async def cancel_editing_gene(message: Message, state: FSMContext):
     await state.set_state(AdminStates.admin_menu)
-    await message.answer("❌ Редактирование отменено", reply_markup=get_admin_keyboard())
+    await message.answer(
+        "❌ Редактирование отменено", reply_markup=get_admin_keyboard()
+    )
 
 
 @router.message(AdminStates.editing_gene)
-async def process_edit_gene_field(message: Message, state: FSMContext, db: AsyncSession):
+async def process_edit_gene_field(
+    message: Message, state: FSMContext, db: AsyncSession
+):
     if message.from_user is None:
         return
     if not is_admin(message.from_user.id):
@@ -360,13 +417,19 @@ async def process_edit_gene_field(message: Message, state: FSMContext, db: Async
 
     # Валидация по полю
     if field == "description" and len(value) < 20:
-        await message.answer("❌ Описание слишком короткое (минимум 20 символов). Попробуйте ещё раз:")
+        await message.answer(
+            "❌ Описание слишком короткое (минимум 20 символов). Попробуйте ещё раз:"
+        )
         return
     if field == "hint" and len(value) < 10:
-        await message.answer("❌ Подсказка слишком короткая (минимум 10 символов). Попробуйте ещё раз:")
+        await message.answer(
+            "❌ Подсказка слишком короткая (минимум 10 символов). Попробуйте ещё раз:"
+        )
         return
     if field == "difficulty" and value.lower() not in ("easy", "medium", "hard"):
-        await message.answer("❌ Допустимые значения: easy, medium, hard. Попробуйте ещё раз:")
+        await message.answer(
+            "❌ Допустимые значения: easy, medium, hard. Попробуйте ещё раз:"
+        )
         return
 
     if field == "difficulty":
@@ -380,8 +443,7 @@ async def process_edit_gene_field(message: Message, state: FSMContext, db: Async
 
     await state.set_state(AdminStates.admin_menu)
     await message.answer(
-        f"✅ <b>Ген {gene.name} обновлён!</b>\n\n"
-        f"Поле <b>{field}</b> изменено.",
+        f"✅ <b>Ген {gene.name} обновлён!</b>\n\n" f"Поле <b>{field}</b> изменено.",
         reply_markup=get_admin_keyboard(),
     )
 
@@ -389,6 +451,7 @@ async def process_edit_gene_field(message: Message, state: FSMContext, db: Async
 # ============================================================================
 # УПРАВЛЕНИЕ ПРИЗАМИ
 # ============================================================================
+
 
 @router.message(F.text == "🎁 Управление призами", AdminStates.admin_menu)
 async def show_prizes(message: Message, state: FSMContext, db: AsyncSession):
@@ -400,14 +463,19 @@ async def show_prizes(message: Message, state: FSMContext, db: AsyncSession):
     prizes = await list_prizes(db)
 
     if not prizes:
-        await message.answer("❌ Призы не найдены в базе. Запустите make db-init", reply_markup=get_admin_keyboard())
+        await message.answer(
+            "❌ Призы не найдены в базе. Запустите make db-init",
+            reply_markup=get_admin_keyboard(),
+        )
         return
 
     buttons = [
-        [InlineKeyboardButton(
-            text=f"{'✅' if p.is_active else '❌'} {p.title}",
-            callback_data=f"admin:prize:{p.id}"
-        )]
+        [
+            InlineKeyboardButton(
+                text=f"{'✅' if p.is_active else '❌'} {p.title}",
+                callback_data=f"admin:prize:{p.id}",
+            )
+        ]
         for p in prizes
     ]
     keyboard = InlineKeyboardMarkup(inline_keyboard=buttons)
@@ -434,12 +502,32 @@ async def show_prize_detail(callback: CallbackQuery, db: AsyncSession):
     status = "✅ Активен" if prize.is_active else "❌ Деактивирован"
     toggle_text = "❌ Деактивировать" if prize.is_active else "✅ Активировать"
 
-    keyboard = InlineKeyboardMarkup(inline_keyboard=[
-        [InlineKeyboardButton(text=toggle_text, callback_data=f"admin:prize_toggle:{prize_id}")],
-        [InlineKeyboardButton(text="✏️ Изменить описание", callback_data=f"admin:prize_field:description:{prize_id}")],
-        [InlineKeyboardButton(text="🔑 Изменить промокод/значение", callback_data=f"admin:prize_field:prize_value:{prize_id}")],
-        [InlineKeyboardButton(text="◀️ Назад к призам", callback_data="admin:back_to_prizes")],
-    ])
+    keyboard = InlineKeyboardMarkup(
+        inline_keyboard=[
+            [
+                InlineKeyboardButton(
+                    text=toggle_text, callback_data=f"admin:prize_toggle:{prize_id}"
+                )
+            ],
+            [
+                InlineKeyboardButton(
+                    text="✏️ Изменить описание",
+                    callback_data=f"admin:prize_field:description:{prize_id}",
+                )
+            ],
+            [
+                InlineKeyboardButton(
+                    text="🔑 Изменить промокод/значение",
+                    callback_data=f"admin:prize_field:prize_value:{prize_id}",
+                )
+            ],
+            [
+                InlineKeyboardButton(
+                    text="◀️ Назад к призам", callback_data="admin:back_to_prizes"
+                )
+            ],
+        ]
+    )
 
     text = (
         f"🎁 <b>{prize.title}</b>\n\n"
@@ -458,18 +546,19 @@ async def back_to_prizes(callback: CallbackQuery, db: AsyncSession):
     prizes = await list_prizes(db)
 
     buttons = [
-        [InlineKeyboardButton(
-            text=f"{'✅' if p.is_active else '❌'} {p.title}",
-            callback_data=f"admin:prize:{p.id}"
-        )]
+        [
+            InlineKeyboardButton(
+                text=f"{'✅' if p.is_active else '❌'} {p.title}",
+                callback_data=f"admin:prize:{p.id}",
+            )
+        ]
         for p in prizes
     ]
     keyboard = InlineKeyboardMarkup(inline_keyboard=buttons)
 
     if isinstance(callback.message, Message):
         await callback.message.edit_text(
-            "🎁 <b>Управление призами</b>\n\n"
-            "✅ — активен, ❌ — деактивирован",
+            "🎁 <b>Управление призами</b>\n\n" "✅ — активен, ❌ — деактивирован",
             reply_markup=keyboard,
         )
     await callback.answer()
@@ -493,7 +582,9 @@ async def toggle_prize_active(callback: CallbackQuery, db: AsyncSession):
 
 
 @router.callback_query(F.data.startswith("admin:prize_field:"))
-async def start_edit_prize_field(callback: CallbackQuery, state: FSMContext, db: AsyncSession):
+async def start_edit_prize_field(
+    callback: CallbackQuery, state: FSMContext, db: AsyncSession
+):
     if not callback.data:
         await callback.answer("Неверные данные", show_alert=True)
         return
@@ -526,11 +617,15 @@ async def start_edit_prize_field(callback: CallbackQuery, state: FSMContext, db:
 @router.message(F.text == "❌ Отмена", AdminStates.editing_prize)
 async def cancel_editing_prize(message: Message, state: FSMContext):
     await state.set_state(AdminStates.admin_menu)
-    await message.answer("❌ Редактирование отменено", reply_markup=get_admin_keyboard())
+    await message.answer(
+        "❌ Редактирование отменено", reply_markup=get_admin_keyboard()
+    )
 
 
 @router.message(AdminStates.editing_prize)
-async def process_edit_prize_field(message: Message, state: FSMContext, db: AsyncSession):
+async def process_edit_prize_field(
+    message: Message, state: FSMContext, db: AsyncSession
+):
     if message.from_user is None:
         return
     if not is_admin(message.from_user.id):
@@ -549,7 +644,9 @@ async def process_edit_prize_field(message: Message, state: FSMContext, db: Asyn
         return
 
     if field == "description" and len(value) < 10:
-        await message.answer("❌ Описание слишком короткое (минимум 10 символов). Попробуйте ещё раз:")
+        await message.answer(
+            "❌ Описание слишком короткое (минимум 10 символов). Попробуйте ещё раз:"
+        )
         return
     if field == "prize_value" and len(value) < 2:
         await message.answer("❌ Значение слишком короткое. Попробуйте ещё раз:")

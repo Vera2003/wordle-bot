@@ -19,7 +19,7 @@ from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine
 root = Path(__file__).parent.parent
 sys.path.insert(0, str(root))
 
-from src.core.config import get_settings
+from src.infrastructure.config.settings import get_settings
 from src.infrastructure.db.base import Base
 from src.infrastructure.db.models.achievement import AchievementTypeModel, UserAchievementModel  # noqa: F401
 from src.infrastructure.db.models.game import GameAttemptModel, GameSessionModel  # noqa: F401

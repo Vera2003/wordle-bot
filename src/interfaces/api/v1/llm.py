@@ -6,6 +6,8 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from src.application.llm import (
     AskGeneticsQuestionCommand,
     AskGeneticsQuestionHandler,
+    ChatAnswerOutput,
+    GeneFactOutput,
     GenerateGeneFactCommand,
     GenerateGeneFactHandler,
     GetLLMLogsHandler,
@@ -15,15 +17,13 @@ from src.application.llm import (
     LLMGenerationService,
     LLMLogListOutput,
     LLMStatsOutput,
-    ChatAnswerOutput,
-    GeneFactOutput,
 )
-from src.core.config import Settings, get_settings
-from src.core.security import require_admin_api_key
 from src.domain.llm import LLMRequestType
+from src.infrastructure.config.settings import Settings, get_settings
 from src.infrastructure.db.repositories.llm import LLMLogRepositoryImpl
 from src.infrastructure.db.session import get_db_session
 from src.infrastructure.llm import ProxyApiLLMService
+from src.interfaces.api.security import require_admin_api_key
 
 router = APIRouter(prefix="/llm", tags=["llm"])
 

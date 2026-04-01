@@ -1,4 +1,4 @@
-.PHONY: help install run-api run-bot docker-up docker-down lint test test-unit test-integration db-init migrate revision all
+.PHONY: help install run-api run-bot docker-up docker-down lint test test-unit test-integration test-smoke db-init migrate revision all
 
 # Переменные
 PYTHON := uv run python
@@ -35,16 +35,19 @@ lint-fix: ## Автоматически исправить стиль кода (
 	$(PYTHON) -m black src tests
 
 test: ## Запустить все тесты
-	$(PYTEST) src/tests -v
+	$(PYTEST) tests -v
 
 test-unit: ## Запустить только unit тесты
-	$(PYTEST) src/tests -v -m "not integration"
+	$(PYTEST) tests/unit -v
 
 test-integration: ## Запустить только integration тесты
-	$(PYTEST) src/tests -v -m "integration"
+	$(PYTEST) tests/integration -v
+
+test-smoke: ## Запустить smoke/e2e проверки
+	$(PYTEST) tests/e2e -v
 
 test-cov: ## Запустить тесты с отчетом покрытия
-	$(PYTEST) src/tests --cov=src --cov-report=html --cov-report=term
+	$(PYTEST) tests --cov=src --cov-report=html --cov-report=term
 
 db-init: ## Инициализировать базовые данные (гены, достижения, призы)
 	$(PYTHON) scripts/init_genes.py

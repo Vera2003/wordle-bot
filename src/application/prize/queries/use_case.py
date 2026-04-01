@@ -5,7 +5,13 @@ from uuid import UUID
 from pydantic import BaseModel, ConfigDict, Field
 
 from src.application.prize.dto import PrizeOutput, UserPrizeOutput
-from src.domain.prize import Prize, PrizeNotFoundError, PrizeRepository, UserPrize, UserPrizeRepository
+from src.domain.prize import (
+    Prize,
+    PrizeNotFoundError,
+    PrizeRepository,
+    UserPrize,
+    UserPrizeRepository,
+)
 
 
 def _to_prize_output(prize: Prize) -> PrizeOutput:

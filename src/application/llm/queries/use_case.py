@@ -207,6 +207,10 @@ class GetLLMStatsHandler:
             total_requests=total,
             fallback_count=fallback_count,
             fallback_rate=round(fallback_count / total * 100, 2) if total else 0.0,
-            avg_latency_ms=round(float(avg_latency), 1) if avg_latency is not None else None,
-            requests_by_type={request_type.value: count for request_type, count in counts.items()},
+            avg_latency_ms=(
+                round(float(avg_latency), 1) if avg_latency is not None else None
+            ),
+            requests_by_type={
+                request_type.value: count for request_type, count in counts.items()
+            },
         )

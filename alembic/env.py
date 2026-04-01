@@ -9,7 +9,7 @@ from sqlalchemy.ext.asyncio import async_engine_from_config
 
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
-from src.core.config import get_settings
+from src.infrastructure.config.settings import get_settings
 from src.infrastructure.db.base import Base
 from src.infrastructure.db.models import (  # noqa: F401
     AchievementTypeModel,
@@ -25,7 +25,8 @@ from src.infrastructure.db.models import (  # noqa: F401
 
 config = context.config
 settings = get_settings()
-config.set_main_option("sqlalchemy.url", settings.database_url)
+if not config.get_main_option("sqlalchemy.url"):
+    config.set_main_option("sqlalchemy.url", settings.database_url)
 
 if config.config_file_name is not None:
     fileConfig(config.config_file_name)

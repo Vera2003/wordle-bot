@@ -1,7 +1,8 @@
+from typing import Any, Awaitable, Callable, Dict
+
 import structlog
-from typing import Callable, Dict, Any, Awaitable
 from aiogram import BaseMiddleware
-from aiogram.types import Message, CallbackQuery, TelegramObject
+from aiogram.types import CallbackQuery, Message, TelegramObject
 
 logger = structlog.get_logger(__name__)
 
@@ -23,27 +24,27 @@ def _user_log_context(user) -> dict[str, Any]:
 
 class LoggingMiddleware(BaseMiddleware):
     """Middleware для логирования всех событий от пользователей"""
-    
+
     async def __call__(
         self,
         handler: Callable[[TelegramObject, Dict[str, Any]], Awaitable[Any]],
         event: TelegramObject,
-        data: Dict[str, Any]
+        data: Dict[str, Any],
     ) -> Any:
         # Логируем сообщения
         if isinstance(event, Message):
             user = event.from_user
-            
+
             log_data = {
                 "event_type": "message",
                 "chat_type": event.chat.type,
                 **_user_log_context(user),
             }
-            
+
             if event.text:
                 log_data["text"] = event.text
                 logger.info("📨 User sent message", **log_data)
-            
+
             if event.photo:
                 logger.info("📷 User sent photo", **log_data)
             if event.document:
@@ -54,38 +55,38 @@ class LoggingMiddleware(BaseMiddleware):
             if event.sticker:
                 log_data["sticker_emoji"] = event.sticker.emoji
                 logger.info("🎭 User sent sticker", **log_data)
-        
+
         # Логируем callback-запросы (нажатия на кнопки)
         elif isinstance(event, CallbackQuery):
             user = event.from_user
-            
+
             logger.info(
                 "🔘 User pressed button",
                 event_type="callback",
                 callback_data=event.data,
                 **_user_log_context(user),
             )
-        
+
         # Вызываем обработчик
         try:
             result = await handler(event, data)
-            
+
             # Логируем успешную обработку
             if isinstance(event, Message):
                 logger.debug(
                     "✅ Message processed",
                     message_id=event.message_id,
-                    user_id=event.from_user.id if event.from_user else None
+                    user_id=event.from_user.id if event.from_user else None,
                 )
             elif isinstance(event, CallbackQuery):
                 logger.debug(
                     "✅ Callback processed",
                     callback_id=event.id,
-                    user_id=event.from_user.id if event.from_user else None
+                    user_id=event.from_user.id if event.from_user else None,
                 )
-            
+
             return result
-            
+
         except Exception as e:
             # Логируем ошибки
             if isinstance(event, Message):
@@ -94,7 +95,7 @@ class LoggingMiddleware(BaseMiddleware):
                     message_id=event.message_id,
                     user_id=event.from_user.id if event.from_user else None,
                     error=str(e),
-                    exc_info=True
+                    exc_info=True,
                 )
             elif isinstance(event, CallbackQuery):
                 logger.error(
@@ -102,6 +103,6 @@ class LoggingMiddleware(BaseMiddleware):
                     callback_id=event.id,
                     user_id=event.from_user.id if event.from_user else None,
                     error=str(e),
-                    exc_info=True
+                    exc_info=True,
                 )
             raise

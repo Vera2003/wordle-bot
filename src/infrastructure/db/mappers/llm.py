@@ -1,6 +1,13 @@
 """Mapper for LLM log ORM model and domain entity."""
 
-from src.domain.llm import LLMLogEntry, LLMModel, LLMLatency, LLMPrompt, LLMRequestType, LLMResponse
+from src.domain.llm import (
+    LLMLatency,
+    LLMLogEntry,
+    LLMModel,
+    LLMPrompt,
+    LLMRequestType,
+    LLMResponse,
+)
 from src.infrastructure.db.models.llm import LLMLogModel
 
 

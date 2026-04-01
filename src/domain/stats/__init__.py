@@ -1,19 +1,9 @@
 """Stats domain module."""
 
-from .value_objects import (
-    WinRate,
-    GameStats,
-    GlobalStats,
-    UserStats,
-    TopPlayer,
-)
-from .services import StatsCalculator
+from .errors import InvalidWinRateError, StatsError, UserNotFoundError
 from .repositories import StatsRepository
-from .errors import (
-    StatsError,
-    UserNotFoundError,
-    InvalidWinRateError,
-)
+from .services import StatsCalculator
+from .value_objects import GameStats, GlobalStats, TopPlayer, UserStats, WinRate
 
 __all__ = [
     "WinRate",

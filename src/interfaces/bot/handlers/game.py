@@ -1,8 +1,8 @@
 """
 Хендлеры игрового процесса.
 """
+
 import re
-from datetime import date
 
 import structlog
 from aiogram import F, Router
@@ -10,6 +10,7 @@ from aiogram.fsm.context import FSMContext
 from aiogram.types import CallbackQuery, Message
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from src.infrastructure.config.settings import get_settings
 from src.interfaces.bot.legacy_facade import (
     BotAttemptResult,
     BotGameSession,
@@ -27,6 +28,8 @@ from src.interfaces.bot.legacy_facade import (
     start_game_session,
     surrender_game_session,
 )
+from src.utils.time_helpers import get_today_date
+
 from ..keyboards.menu import get_game_keyboard, get_main_menu_keyboard
 from ..states.game import GameStates
 from ..texts.messages import (
@@ -37,28 +40,29 @@ from ..texts.messages import (
     WIN_MESSAGE,
     format_attempt_result,
 )
-from src.core.config import get_settings
-from src.utils.time_helpers import get_today_date
 
 router = Router()
 logger = structlog.get_logger(__name__)
 settings = get_settings()
 
-MENU_TEXTS = frozenset({
-    "🏠 Главное меню",
-    "📊 Статистика",
-    "🏆 Мои достижения",
-    "📋 Правила игры",
-    "💡 Подсказка дня",
-    "⚡ Энергия",
-    "🎮 Играть",
-    "🤖 Спросить ИИ",  # ← ДОБАВЛЕНО чтобы не перехватывался в игре
-})
+MENU_TEXTS = frozenset(
+    {
+        "🏠 Главное меню",
+        "📊 Статистика",
+        "🏆 Мои достижения",
+        "📋 Правила игры",
+        "💡 Подсказка дня",
+        "⚡ Энергия",
+        "🎮 Играть",
+        "🤖 Спросить ИИ",  # ← ДОБАВЛЕНО чтобы не перехватывался в игре
+    }
+)
 
 
 # ---------------------------------------------------------------------------
 # Вспомогательные функции для отправки результата игры + факта от ИИ
 # ---------------------------------------------------------------------------
+
 
 async def _send_win(
     message: Message,
@@ -79,7 +83,9 @@ async def _send_win(
             total_points=user.total_points,
         )
     )
-    await _send_gene_fact(message, session.gene.name, session.gene.description, db=db, user=user)
+    await _send_gene_fact(
+        message, session.gene.name, session.gene.description, db=db, user=user
+    )
 
 
 async def _send_lose(
@@ -97,7 +103,9 @@ async def _send_lose(
             total_points=user.total_points if user else 0,
         )
     )
-    await _send_gene_fact(message, session.gene.name, session.gene.description, db=db, user=user)
+    await _send_gene_fact(
+        message, session.gene.name, session.gene.description, db=db, user=user
+    )
 
 
 async def _send_gene_fact(
@@ -120,10 +128,10 @@ async def _send_gene_fact(
         await message.bot.send_chat_action(  # type: ignore[union-attr]
             chat_id=message.chat.id, action="typing"
         )
-        fact = await get_gene_fact(db, user.id if user else None, gene_name, gene_description)
-        await message.answer(
-            f"🧬 <b>Интересный факт о {gene_name}</b>\n\n{fact}"
+        fact = await get_gene_fact(
+            db, user.id if user else None, gene_name, gene_description
         )
+        await message.answer(f"🧬 <b>Интересный факт о {gene_name}</b>\n\n{fact}")
     except Exception as e:
         logger.warning("Failed to send gene fact", gene=gene_name, error=str(e))
 
@@ -131,6 +139,7 @@ async def _send_gene_fact(
 # ---------------------------------------------------------------------------
 # Хендлеры
 # ---------------------------------------------------------------------------
+
 
 @router.message(F.text == "🎮 Играть")
 async def start_game(
@@ -318,7 +327,9 @@ async def use_hint(
         return
 
     if session.hint_used:
-        await callback.answer("❌ Подсказка уже использована в этой игре!", show_alert=True)
+        await callback.answer(
+            "❌ Подсказка уже использована в этой игре!", show_alert=True
+        )
         return
 
     current_energy = await get_user_energy(db, redis, user.id)

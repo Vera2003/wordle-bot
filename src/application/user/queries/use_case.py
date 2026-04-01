@@ -5,7 +5,7 @@ from uuid import UUID
 
 from pydantic import BaseModel, ConfigDict
 
-from src.domain.user import UserNotFoundError, UserRepository, Username
+from src.domain.user import Username, UserNotFoundError, UserRepository
 
 
 def _username_value(username: Username | None) -> str | None:
@@ -14,17 +14,17 @@ def _username_value(username: Username | None) -> str | None:
 
 class GetUserProfileQuery(BaseModel):
     """Query to get user profile."""
-    
+
     model_config = ConfigDict(extra="forbid")
-    
+
     user_id: UUID
 
 
 class GetUserProfileOutput(BaseModel):
     """User profile information."""
-    
+
     model_config = ConfigDict(from_attributes=True)
-    
+
     user_id: UUID
     telegram_id: int
     username: str | None
@@ -38,17 +38,17 @@ class GetUserProfileOutput(BaseModel):
 
 class GetUserProfileHandler:
     """Handler for GetUserProfile query."""
-    
+
     def __init__(self, user_repository: UserRepository):
         self.user_repository = user_repository
-    
+
     async def __call__(self, query: GetUserProfileQuery) -> GetUserProfileOutput:
         """Execute query."""
         user = await self.user_repository.get_by_id(query.user_id)
-        
+
         if not user:
             raise UserNotFoundError(f"User {query.user_id} not found")
-        
+
         return GetUserProfileOutput(
             user_id=user.id,
             telegram_id=user.telegram_id.value,

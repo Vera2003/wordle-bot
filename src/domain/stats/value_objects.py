@@ -6,13 +6,13 @@ from dataclasses import dataclass
 @dataclass(frozen=True)
 class WinRate:
     """Value object: Win rate percentage (0-100)."""
-    
+
     value: float
-    
+
     def __post_init__(self):
         if not (0.0 <= self.value <= 100.0):
             raise ValueError("Win rate must be between 0 and 100")
-    
+
     def __repr__(self) -> str:
         return f"WinRate({self.value:.2f}%)"
 
@@ -20,12 +20,12 @@ class WinRate:
 @dataclass(frozen=True)
 class GameStats:
     """Value object: Aggregated game statistics."""
-    
+
     total_games: int
     won_games: int
     lost_games: int
     win_rate: WinRate
-    
+
     def __post_init__(self):
         if self.total_games < 0:
             raise ValueError("Total games cannot be negative")
@@ -40,11 +40,11 @@ class GameStats:
 @dataclass(frozen=True)
 class TopPlayer:
     """Value object: Player in top list."""
-    
+
     telegram_id: int
     name: str
     points: int
-    
+
     def __post_init__(self):
         if self.telegram_id <= 0:
             raise ValueError("Telegram ID must be positive")
@@ -57,7 +57,7 @@ class TopPlayer:
 @dataclass(frozen=True)
 class GlobalStats:
     """Value object: Global statistics for entire system."""
-    
+
     total_users: int
     total_games: int
     won_games: int
@@ -66,7 +66,7 @@ class GlobalStats:
     total_genes: int
     active_genes: int
     top_players: list[TopPlayer]
-    
+
     def __post_init__(self):
         if self.total_users < 0:
             raise ValueError("Total users cannot be negative")
@@ -83,14 +83,14 @@ class GlobalStats:
 @dataclass(frozen=True)
 class UserStats:
     """Value object: Statistics for a specific user."""
-    
+
     telegram_id: int
     username: str | None
     full_name: str | None
     total_points: int
     energy: int
     game_stats: GameStats
-    
+
     def __post_init__(self):
         if self.telegram_id <= 0:
             raise ValueError("Telegram ID must be positive")

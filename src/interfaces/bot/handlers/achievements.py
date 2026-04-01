@@ -5,11 +5,13 @@
 - Дублирующийся блок isinstance(event, CallbackQuery) заменён на однострочник
 - user: User | None инжектируется через UserMiddleware (нет повторного fetch)
 """
+
 from aiogram import F, Router
 from aiogram.types import CallbackQuery, Message
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.interfaces.bot.legacy_facade import BotUser, get_user_energy, get_user_stats
+
 from ..keyboards.menu import get_main_menu_keyboard
 from ..texts.messages import ACHIEVEMENTS_MESSAGE, STATS_MESSAGE
 
@@ -33,7 +35,7 @@ async def show_stats(
     message = _get_message(event)
     if not message:
         return
-    
+
     if not user:
         await message.answer("❌ Используйте /start")
         return
@@ -56,7 +58,9 @@ async def show_stats(
         if not message:
             await event.answer()
             return
-        await message.answer(text, reply_markup=get_main_menu_keyboard())  # answer, не edit_text
+        await message.answer(
+            text, reply_markup=get_main_menu_keyboard()
+        )  # answer, не edit_text
         await event.answer()
     else:
         await event.answer(text, reply_markup=get_main_menu_keyboard())
@@ -87,7 +91,9 @@ async def show_achievements(
         if not message:
             await event.answer()
             return
-        await message.answer(text, reply_markup=get_main_menu_keyboard())  # answer, не edit_text
+        await message.answer(
+            text, reply_markup=get_main_menu_keyboard()
+        )  # answer, не edit_text
         await event.answer()
     else:
         await event.answer(text, reply_markup=get_main_menu_keyboard())

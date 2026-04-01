@@ -10,11 +10,11 @@ from aiogram import Bot, Dispatcher
 from aiogram.client.default import DefaultBotProperties
 from aiogram.enums import ParseMode
 from aiogram.fsm.storage.redis import RedisStorage
-from sqlalchemy.ext.asyncio import async_sessionmaker
+from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
-from src.core.config import Settings, get_settings
-from src.core.logging_config import setup_logging
+from src.infrastructure.config.settings import Settings, get_settings
 from src.infrastructure.db.engine import create_db_engine, create_session_maker
+from src.infrastructure.telemetry.logging import setup_logging
 from src.interfaces.bot.handlers import achievements, admin, chat, game, start
 from src.interfaces.bot.middleware.db import DbSessionMiddleware
 from src.interfaces.bot.middleware.logging import LoggingMiddleware
@@ -33,7 +33,7 @@ def create_bot(settings: Settings) -> Bot:
 
 
 def create_dispatcher(
-    session_maker: async_sessionmaker,
+    session_maker: async_sessionmaker[AsyncSession],
     redis_client: aioredis.Redis,
 ) -> Dispatcher:
     """Create and wire the dispatcher, middleware, and routers."""

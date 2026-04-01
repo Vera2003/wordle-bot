@@ -1,11 +1,6 @@
 """Stats application layer module."""
 
-from .dto import (
-    TopPlayerOutput,
-    GameStatsOutput,
-    GlobalStatsOutput,
-    UserStatsOutput,
-)
+from .dto import GameStatsOutput, GlobalStatsOutput, TopPlayerOutput, UserStatsOutput
 from .queries import (
     GetGlobalStatsHandler,
     GetGlobalStatsQuery,

@@ -1,14 +1,25 @@
 """Game ORM model."""
 
-from datetime import datetime
 import uuid
-from typing import List, Optional
+from datetime import datetime
+from typing import List, Literal, Optional, TypedDict
 
-from sqlalchemy import Boolean, DateTime, ForeignKey, Integer, JSON, String, func
+from sqlalchemy import JSON, Boolean, DateTime, ForeignKey, Integer, String, func
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 from sqlalchemy.types import TypeDecorator
 
 from ..base import Base
+
+GuessStatus = Literal["correct", "present", "absent"]
+
+
+class GuessLetterPayload(TypedDict):
+    letter: str
+    status: GuessStatus
+
+
+class GuessResultPayload(TypedDict):
+    letters: list[GuessLetterPayload]
 
 
 class UUIDString(TypeDecorator[str]):
@@ -35,8 +46,12 @@ class GameSessionModel(Base):
 
     __tablename__ = "game_sessions"
 
-    id: Mapped[str] = mapped_column(UUIDString(), primary_key=True, default=lambda: str(uuid.uuid4()))
-    user_id: Mapped[str] = mapped_column(UUIDString(), ForeignKey("users.id"), nullable=False)
+    id: Mapped[str] = mapped_column(
+        UUIDString(), primary_key=True, default=lambda: str(uuid.uuid4())
+    )
+    user_id: Mapped[str] = mapped_column(
+        UUIDString(), ForeignKey("users.id"), nullable=False
+    )
     word: Mapped[str] = mapped_column(String(50), nullable=False)
     max_attempts: Mapped[int] = mapped_column(Integer, default=6)
     attempts_count: Mapped[int] = mapped_column(Integer, default=0)
@@ -60,7 +75,9 @@ class GameAttemptModel(Base):
 
     __tablename__ = "game_attempts"
 
-    id: Mapped[str] = mapped_column(UUIDString(), primary_key=True, default=lambda: str(uuid.uuid4()))
+    id: Mapped[str] = mapped_column(
+        UUIDString(), primary_key=True, default=lambda: str(uuid.uuid4())
+    )
     session_id: Mapped[str] = mapped_column(
         UUIDString(),
         ForeignKey("game_sessions.id", ondelete="CASCADE"),
@@ -69,7 +86,7 @@ class GameAttemptModel(Base):
 
     attempt_number: Mapped[int] = mapped_column(Integer, nullable=False)
     guess_word: Mapped[str] = mapped_column(String(50), nullable=False)
-    result: Mapped[dict] = mapped_column(JSON, nullable=False)
+    result: Mapped[GuessResultPayload] = mapped_column(JSON, nullable=False)
 
     created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
 

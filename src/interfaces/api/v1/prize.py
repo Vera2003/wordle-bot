@@ -25,10 +25,13 @@ from src.application.prize import (
     PrizeOutput,
     UserPrizeOutput,
 )
-from src.core.security import require_admin_api_key
 from src.domain.prize import PrizeNotAvailableError, PrizeNotFoundError
-from src.infrastructure.db.repositories.prize import PrizeRepositoryImpl, UserPrizeRepositoryImpl
+from src.infrastructure.db.repositories.prize import (
+    PrizeRepositoryImpl,
+    UserPrizeRepositoryImpl,
+)
 from src.infrastructure.db.session import get_db_session
+from src.interfaces.api.security import require_admin_api_key
 
 router = APIRouter(prefix="/prizes", tags=["prizes"])
 
@@ -41,7 +44,9 @@ class MarkPrizeAsUsedInput(BaseModel):
     used_at: datetime | None = None
 
 
-async def get_prize_repository(db: AsyncSession = Depends(get_db_session)) -> PrizeRepositoryImpl:
+async def get_prize_repository(
+    db: AsyncSession = Depends(get_db_session),
+) -> PrizeRepositoryImpl:
     """Dependency: get prize repository."""
     return PrizeRepositoryImpl(db)
 
@@ -72,7 +77,9 @@ async def get_unused_user_prizes(
         handler = GetUnusedUserPrizesHandler(repository)
         return await handler(GetUnusedUserPrizesQuery(user_id=user_id))
     except ValueError as error:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(error)) from error
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST, detail=str(error)
+        ) from error
 
 
 @router.get("/users/{user_id}")
@@ -86,7 +93,9 @@ async def get_user_prizes(
         handler = GetUserPrizesHandler(repository)
         return await handler(GetUserPrizesQuery(user_id=user_id, used_only=used_only))
     except ValueError as error:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(error)) from error
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST, detail=str(error)
+        ) from error
 
 
 @router.get("/{prize_id}")
@@ -99,12 +108,20 @@ async def get_prize(
         handler = GetPrizeByIdHandler(repository)
         return await handler(GetPrizeByIdQuery(prize_id=prize_id))
     except PrizeNotFoundError as error:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Prize not found") from error
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="Prize not found"
+        ) from error
     except ValueError as error:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(error)) from error
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST, detail=str(error)
+        ) from error
 
 
-@router.post("/", status_code=status.HTTP_201_CREATED, dependencies=[Depends(require_admin_api_key)])
+@router.post(
+    "/",
+    status_code=status.HTTP_201_CREATED,
+    dependencies=[Depends(require_admin_api_key)],
+)
 async def create_prize(
     command: CreatePrizeCommand,
     repository: PrizeRepositoryImpl = Depends(get_prize_repository),
@@ -114,7 +131,9 @@ async def create_prize(
         handler = CreatePrizeHandler(repository)
         return await handler(command)
     except ValueError as error:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(error)) from error
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST, detail=str(error)
+        ) from error
 
 
 @router.post("/award", dependencies=[Depends(require_admin_api_key)])
@@ -128,14 +147,22 @@ async def award_prize(
         handler = AwardPrizeHandler(prize_repository, user_prize_repository)
         return await handler(command)
     except PrizeNotFoundError as error:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Prize not found") from error
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="Prize not found"
+        ) from error
     except PrizeNotAvailableError as error:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(error)) from error
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST, detail=str(error)
+        ) from error
     except ValueError as error:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(error)) from error
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST, detail=str(error)
+        ) from error
 
 
-@router.post("/user-prizes/{user_prize_id}/use", dependencies=[Depends(require_admin_api_key)])
+@router.post(
+    "/user-prizes/{user_prize_id}/use", dependencies=[Depends(require_admin_api_key)]
+)
 async def mark_prize_as_used(
     user_prize_id: UUID,
     body: MarkPrizeAsUsedInput,
@@ -151,6 +178,10 @@ async def mark_prize_as_used(
             )
         )
     except PrizeNotFoundError as error:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User prize not found") from error
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="User prize not found"
+        ) from error
     except ValueError as error:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(error)) from error
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST, detail=str(error)
+        ) from error

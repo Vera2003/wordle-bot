@@ -9,7 +9,6 @@
 - Все импорты на уровне модуля, не внутри функций
 - Добавлен /help как алиас для правил
 """
-from datetime import datetime, timezone
 
 import structlog
 from aiogram import F, Router
@@ -18,22 +17,29 @@ from aiogram.fsm.context import FSMContext
 from aiogram.types import CallbackQuery, Message
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from src.infrastructure.config.settings import get_settings
 from src.interfaces.bot.legacy_facade import (
     BotUser,
     cancel_active_game_for_user,
     get_or_create_user,
     get_user_energy,
     reset_user_daily_state,
-    show_daily_hint as facade_show_daily_hint,
 )
+from src.interfaces.bot.legacy_facade import show_daily_hint as facade_show_daily_hint
+
 from ..keyboards.menu import get_main_menu_keyboard
 from ..states.game import GameStates
-from ..texts.messages import ENERGY_MESSAGE, MAIN_MENU_MESSAGE, RULES_MESSAGE, WELCOME_MESSAGE
-from src.core.config import get_settings
+from ..texts.messages import (
+    ENERGY_MESSAGE,
+    MAIN_MENU_MESSAGE,
+    RULES_MESSAGE,
+    WELCOME_MESSAGE,
+)
 
 router = Router()
 logger = structlog.get_logger(__name__)
 settings = get_settings()
+
 
 @router.message(Command("resetday"))
 async def cmd_reset_day(
@@ -188,4 +194,6 @@ async def cmd_cancel_game(
             reply_markup=get_main_menu_keyboard(),
         )
     else:
-        await message.answer("ℹ️ У вас нет активных игр", reply_markup=get_main_menu_keyboard())
+        await message.answer(
+            "ℹ️ У вас нет активных игр", reply_markup=get_main_menu_keyboard()
+        )

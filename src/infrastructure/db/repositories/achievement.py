@@ -12,8 +12,14 @@ from src.domain.achievement import (
     UserAchievement,
     UserAchievementRepository,
 )
-from src.infrastructure.db.mappers.achievement import AchievementTypeMapper, UserAchievementMapper
-from src.infrastructure.db.models.achievement import AchievementTypeModel, UserAchievementModel
+from src.infrastructure.db.mappers.achievement import (
+    AchievementTypeMapper,
+    UserAchievementMapper,
+)
+from src.infrastructure.db.models.achievement import (
+    AchievementTypeModel,
+    UserAchievementModel,
+)
 
 
 class AchievementTypeRepositoryImpl(AchievementTypeRepository):
@@ -41,14 +47,23 @@ class AchievementTypeRepositoryImpl(AchievementTypeRepository):
 
     async def get_by_name(self, name: str) -> Optional[AchievementType]:
         result = await self.session.execute(
-            select(AchievementTypeModel).where(AchievementTypeModel.name == name.lower().strip())
+            select(AchievementTypeModel).where(
+                AchievementTypeModel.name == name.lower().strip()
+            )
         )
         model = result.scalars().first()
         return AchievementTypeMapper.model_to_domain(model) if model else None
 
     async def get_all(self) -> list[AchievementType]:
-        result = await self.session.execute(select(AchievementTypeModel).order_by(AchievementTypeModel.created_at.desc()))
-        return [AchievementTypeMapper.model_to_domain(model) for model in result.scalars().all()]
+        result = await self.session.execute(
+            select(AchievementTypeModel).order_by(
+                AchievementTypeModel.created_at.desc()
+            )
+        )
+        return [
+            AchievementTypeMapper.model_to_domain(model)
+            for model in result.scalars().all()
+        ]
 
     async def delete(self, achievement_id: UUID) -> None:
         model = await self.session.get(AchievementTypeModel, achievement_id)
@@ -97,7 +112,19 @@ class UserAchievementRepositoryImpl(UserAchievementRepository):
             .where(UserAchievementModel.user_id == user_id)
             .order_by(UserAchievementModel.unlocked_at.desc())
         )
-        return [UserAchievementMapper.model_to_domain(model) for model in result.scalars().all()]
+        return [
+            UserAchievementMapper.model_to_domain(model)
+            for model in result.scalars().all()
+        ]
+
+    async def delete_by_user(self, user_id: UUID) -> None:
+        """Delete all unlocked achievements for a user."""
+        result = await self.session.execute(
+            select(UserAchievementModel).where(UserAchievementModel.user_id == user_id)
+        )
+        for model in result.scalars().all():
+            await self.session.delete(model)
+        await self.session.flush()
 
     async def delete(self, user_achievement_id: UUID) -> None:
         model = await self.session.get(UserAchievementModel, user_achievement_id)

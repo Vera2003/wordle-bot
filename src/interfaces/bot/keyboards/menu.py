@@ -32,9 +32,7 @@ def get_main_menu_keyboard() -> ReplyKeyboardMarkup:
 
 def get_game_keyboard() -> InlineKeyboardMarkup:
     builder = InlineKeyboardBuilder()
-    builder.row(
-        InlineKeyboardButton(text="❌ Сдаться", callback_data="game:surrender")
-    )
+    builder.row(InlineKeyboardButton(text="❌ Сдаться", callback_data="game:surrender"))
     return builder.as_markup()
 
 

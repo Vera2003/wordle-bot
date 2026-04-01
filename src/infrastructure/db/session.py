@@ -8,8 +8,8 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 async def get_db_session(request: Request) -> AsyncGenerator[AsyncSession, None]:
     """FastAPI dependency for getting database session.
-    
-    Session is retrieved from app.state.db_session_maker, which is 
+
+    Session is retrieved from app.state.db_session_maker, which is
     initialized once in lifespan.
     """
     session_maker = request.app.state.db_session_maker

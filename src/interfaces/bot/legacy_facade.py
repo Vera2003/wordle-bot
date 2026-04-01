@@ -9,9 +9,7 @@ from typing import Any
 from uuid import UUID
 
 import redis.asyncio as aioredis
-from sqlalchemy import delete, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy.orm import selectinload
 
 from src.application.game.commands.use_case import (
     StartGameCommand,
@@ -53,23 +51,26 @@ from src.application.user.commands.get_or_create_user import (
     GetOrCreateUserCommand,
     GetOrCreateUserHandler,
 )
-from src.core.config import get_settings
 from src.domain.game.entities import GameSession
 from src.domain.prize import Prize, PrizeValue
 from src.domain.user import TelegramId, User
-from src.infrastructure.db.mappers.game import GameMapper
-from src.infrastructure.db.models.achievement import UserAchievementModel
-from src.infrastructure.db.models.game import GameSessionModel
-from src.infrastructure.db.models.prize import UserPrizeModel
-from src.infrastructure.db.models.user import UserModel
+from src.infrastructure.config.settings import get_settings
+from src.infrastructure.db.repositories.achievement import UserAchievementRepositoryImpl
 from src.infrastructure.db.repositories.game import GameRepositoryImpl
 from src.infrastructure.db.repositories.gene import GeneRepositoryImpl
 from src.infrastructure.db.repositories.llm import LLMLogRepositoryImpl
-from src.infrastructure.db.repositories.prize import PrizeRepositoryImpl
+from src.infrastructure.db.repositories.prize import (
+    PrizeRepositoryImpl,
+    UserPrizeRepositoryImpl,
+)
 from src.infrastructure.db.repositories.stats import StatsRepositoryImpl
 from src.infrastructure.db.repositories.user import UserRepositoryImpl
 from src.infrastructure.llm.proxyapi_service import ProxyApiLLMService
-from src.utils.time_helpers import get_seconds_until_midnight, get_today_date, get_today_str
+from src.utils.time_helpers import (
+    get_seconds_until_midnight,
+    get_today_date,
+    get_today_str,
+)
 
 settings = get_settings()
 _ENERGY_CACHE_TTL = 3600
@@ -234,7 +235,9 @@ async def _game_to_bot_session(
     gene_repository: GeneRepositoryImpl,
     resolved_gene: BotGene | None = None,
 ) -> BotGameSession:
-    gene = resolved_gene or await _resolve_bot_gene(gene_repository, game.target_word.value)
+    gene = resolved_gene or await _resolve_bot_gene(
+        gene_repository, game.target_word.value
+    )
     return BotGameSession(
         id=game.id.hex,
         user_id=game.user_id,
@@ -269,7 +272,9 @@ def _submit_guess_output_to_bot_result(result: SubmitGuessOutput) -> BotAttemptR
     )
 
 
-async def _restore_energy_if_needed(db: AsyncSession, user: User, user_repository: UserRepositoryImpl) -> None:
+async def _restore_energy_if_needed(
+    db: AsyncSession, user: User, user_repository: UserRepositoryImpl
+) -> None:
     now = datetime.now(timezone.utc).replace(tzinfo=None)
     midnight_today = datetime.combine(now.date(), time.min)
     if user.last_energy_reset < midnight_today:
@@ -314,7 +319,7 @@ async def get_or_create_user(
     full_name: str | None,
 ) -> BotUser:
     """Get or create a user and map it into bot context."""
-    handler = GetOrCreateUserHandler(UserRepositoryImpl(db))
+    handler = GetOrCreateUserHandler(UserRepositoryImpl(db), settings.daily_energy)
     user = await handler(
         GetOrCreateUserCommand(
             telegram_id=telegram_id,
@@ -332,7 +337,9 @@ async def get_or_create_user(
     )
 
 
-async def get_user_energy(db: AsyncSession, redis: aioredis.Redis, user_id: UUID | str) -> int:
+async def get_user_energy(
+    db: AsyncSession, redis: aioredis.Redis, user_id: UUID | str
+) -> int:
     """Return current user energy."""
     user_uuid = _parse_uuid(user_id)
     cached = await redis.get(_energy_cache_key(user_uuid))
@@ -345,7 +352,9 @@ async def get_user_energy(db: AsyncSession, redis: aioredis.Redis, user_id: UUID
         return 0
 
     await _restore_energy_if_needed(db, user, user_repository)
-    await redis.set(_energy_cache_key(user_uuid), user.energy.value, ex=_ENERGY_CACHE_TTL)
+    await redis.set(
+        _energy_cache_key(user_uuid), user.energy.value, ex=_ENERGY_CACHE_TTL
+    )
     return user.energy.value
 
 
@@ -370,11 +379,15 @@ async def spend_energy(
 
     await user_repository.save(user)
     await db.commit()
-    await redis.set(_energy_cache_key(user_uuid), user.energy.value, ex=_ENERGY_CACHE_TTL)
+    await redis.set(
+        _energy_cache_key(user_uuid), user.energy.value, ex=_ENERGY_CACHE_TTL
+    )
     return True
 
 
-async def restore_daily_energy(db: AsyncSession, redis: aioredis.Redis, user_id: UUID | str) -> None:
+async def restore_daily_energy(
+    db: AsyncSession, redis: aioredis.Redis, user_id: UUID | str
+) -> None:
     """Restore daily energy for the user."""
     user_uuid = _parse_uuid(user_id)
     user_repository = UserRepositoryImpl(db)
@@ -386,7 +399,9 @@ async def restore_daily_energy(db: AsyncSession, redis: aioredis.Redis, user_id:
     user.restore_energy(restored_at=now, max_energy=settings.daily_energy)
     await user_repository.save(user)
     await db.commit()
-    await redis.set(_energy_cache_key(user_uuid), user.energy.value, ex=_ENERGY_CACHE_TTL)
+    await redis.set(
+        _energy_cache_key(user_uuid), user.energy.value, ex=_ENERGY_CACHE_TTL
+    )
 
 
 async def get_gene_of_day(db: AsyncSession, redis: aioredis.Redis) -> BotGene:
@@ -408,23 +423,35 @@ async def invalidate_gene_of_day(db: AsyncSession, redis: aioredis.Redis) -> Non
     await redis.delete(_gene_of_day_key())
 
 
-async def show_daily_hint(db: AsyncSession, redis: aioredis.Redis, user_id: UUID | str) -> dict[str, Any]:
+async def show_daily_hint(
+    db: AsyncSession, redis: aioredis.Redis, user_id: UUID | str
+) -> dict[str, Any]:
     """Return the daily hint payload."""
     user_uuid = _parse_uuid(user_id)
     gene = await _get_gene_of_day_entity(db, redis)
     hints_used_raw = await redis.get(_daily_hint_key(user_uuid))
     hints_used = int(hints_used_raw) if hints_used_raw else 0
 
-    finished_game = await db.scalar(
-        select(GameSessionModel).where(
-            GameSessionModel.user_id == str(user_uuid),
-            GameSessionModel.word == gene.name.value,
-            GameSessionModel.is_finished.is_(True),
-            func.date(GameSessionModel.created_at) == get_today_date(),
+    finished_game_repository = GameRepositoryImpl(db)
+    has_finished_today = (
+        await finished_game_repository.has_finished_game_for_user_on_date(
+            user_uuid,
+            gene.name.value,
+            get_today_date(),
         )
     )
-    if finished_game is not None:
-        outcome = "угадали слово" if finished_game.is_won else "исчерпали все попытки"
+    if has_finished_today:
+        finished_game = (
+            await finished_game_repository.get_latest_finished_by_user_and_word(
+                user_uuid,
+                gene.name.value,
+            )
+        )
+        outcome = (
+            "угадали слово"
+            if finished_game and finished_game.is_won
+            else "исчерпали все попытки"
+        )
         return {
             "success": False,
             "error": "game_finished",
@@ -446,7 +473,9 @@ async def show_daily_hint(db: AsyncSession, redis: aioredis.Redis, user_id: UUID
             ),
         }
 
-    await redis.set(_daily_hint_key(user_uuid), hints_used + 1, ex=get_seconds_until_midnight())
+    await redis.set(
+        _daily_hint_key(user_uuid), hints_used + 1, ex=get_seconds_until_midnight()
+    )
     difficulty = _DIFFICULTY_EMOJI.get(gene.difficulty.level, gene.difficulty.level)
 
     if hints_used == 0:
@@ -475,19 +504,27 @@ async def show_daily_hint(db: AsyncSession, redis: aioredis.Redis, user_id: UUID
     }
 
 
-async def reset_user_daily_state(db: AsyncSession, redis: aioredis.Redis, user_id: UUID | str) -> None:
+async def reset_user_daily_state(
+    db: AsyncSession, redis: aioredis.Redis, user_id: UUID | str
+) -> None:
     """Remove daily state used by the dev reset command."""
     user_uuid = _parse_uuid(user_id)
     await invalidate_gene_of_day(db, redis)
     await redis.delete(_daily_hint_key(user_uuid), _energy_cache_key(user_uuid))
 
-    await db.execute(delete(GameSessionModel).where(GameSessionModel.user_id == str(user_uuid)))
-    await db.execute(delete(UserAchievementModel).where(UserAchievementModel.user_id == user_uuid))
-    await db.execute(delete(UserPrizeModel).where(UserPrizeModel.user_id == user_uuid))
+    game_repository = GameRepositoryImpl(db)
+    achievement_repository = UserAchievementRepositoryImpl(db)
+    user_prize_repository = UserPrizeRepositoryImpl(db)
+    user_repository = UserRepositoryImpl(db)
 
-    user_model = await db.get(UserModel, user_uuid)
-    if user_model is not None:
-        user_model.total_points = 0
+    await game_repository.delete_by_user(user_uuid)
+    await achievement_repository.delete_by_user(user_uuid)
+    await user_prize_repository.delete_by_user(user_uuid)
+
+    user = await user_repository.get_by_id(user_uuid)
+    if user is not None:
+        user.reset_points()
+        await user_repository.save(user)
 
     await db.commit()
     await restore_daily_energy(db, redis, user_uuid)
@@ -541,23 +578,16 @@ async def find_finished_game_for_gene(
     """Find the finished game for a user and gene."""
     user_uuid = _parse_uuid(user_id)
     gene_repository = GeneRepositoryImpl(db)
+    game_repository = GameRepositoryImpl(db)
     gene = await gene_repository.get_by_id(_parse_uuid(gene_id))
     if gene is None:
         return None
 
-    result = await db.execute(
-        select(GameSessionModel)
-        .options(selectinload(GameSessionModel.attempts_history))
-        .where(
-            GameSessionModel.user_id == str(user_uuid),
-            GameSessionModel.word == gene.name.value,
-            GameSessionModel.is_finished.is_(True),
-        )
-        .order_by(GameSessionModel.created_at.desc())
-        .limit(1)
+    game = await game_repository.get_latest_finished_by_user_and_word(
+        user_uuid,
+        gene.name.value,
     )
-    model = result.scalars().first()
-    if model is None:
+    if game is None:
         return None
 
     bot_gene = BotGene(
@@ -568,10 +598,12 @@ async def find_finished_game_for_gene(
         difficulty=gene.difficulty.level,
         is_active=gene.is_active,
     )
-    return await _game_to_bot_session(GameMapper.model_to_domain(model), gene_repository, resolved_gene=bot_gene)
+    return await _game_to_bot_session(game, gene_repository, resolved_gene=bot_gene)
 
 
-async def start_game_session(db: AsyncSession, user_id: UUID | str, gene_id: str) -> BotGameSession:
+async def start_game_session(
+    db: AsyncSession, user_id: UUID | str, gene_id: str
+) -> BotGameSession:
     """Start a game session and return a bot view."""
     user_uuid = _parse_uuid(user_id)
     gene_uuid = _parse_uuid(gene_id)
@@ -588,12 +620,14 @@ async def start_game_session(db: AsyncSession, user_id: UUID | str, gene_id: str
     return await _game_to_bot_session(game, gene_repository)
 
 
-async def make_attempt(db: AsyncSession, session_id: str, guess: str) -> BotAttemptResult:
+async def make_attempt(
+    db: AsyncSession, session_id: str, guess: str
+) -> BotAttemptResult:
     """Execute one guess attempt."""
     try:
-        result = await SubmitGuessHandler(GameRepositoryImpl(db), UserRepositoryImpl(db))(
-            SubmitGuessCommand(game_id=_parse_uuid(session_id), guess=guess)
-        )
+        result = await SubmitGuessHandler(
+            GameRepositoryImpl(db), UserRepositoryImpl(db)
+        )(SubmitGuessCommand(game_id=_parse_uuid(session_id), guess=guess))
     except Exception as error:
         raise ValueError(str(error)) from error
 
@@ -610,7 +644,9 @@ async def get_game_session(db: AsyncSession, session_id: str) -> BotGameSession 
     return await _game_to_bot_session(game, GeneRepositoryImpl(db))
 
 
-async def mark_game_hint_used(db: AsyncSession, session_id: str) -> BotGameSession | None:
+async def mark_game_hint_used(
+    db: AsyncSession, session_id: str
+) -> BotGameSession | None:
     """Mark the game hint as used."""
     game_repository = GameRepositoryImpl(db)
     game = await game_repository.get_by_id(_parse_uuid(session_id))
@@ -623,7 +659,9 @@ async def mark_game_hint_used(db: AsyncSession, session_id: str) -> BotGameSessi
     return await _game_to_bot_session(game, GeneRepositoryImpl(db))
 
 
-async def surrender_game_session(db: AsyncSession, session_id: str) -> BotGameSession | None:
+async def surrender_game_session(
+    db: AsyncSession, session_id: str
+) -> BotGameSession | None:
     """Finish a game as surrendered."""
     game_repository = GameRepositoryImpl(db)
     game = await game_repository.get_by_id(_parse_uuid(session_id))
@@ -685,7 +723,9 @@ async def answer_genetics_question(
     return result.answer
 
 
-async def get_gene_fact(db: AsyncSession, user_id: UUID | None, gene_name: str, gene_description: str) -> str:
+async def get_gene_fact(
+    db: AsyncSession, user_id: UUID | None, gene_name: str, gene_description: str
+) -> str:
     """Ask the llm client for a gene fact."""
     service = ProxyApiLLMService(settings, LLMLogRepositoryImpl(db))
     result = await GenerateGeneFactHandler(service)(
@@ -742,7 +782,9 @@ async def create_gene(
     return _gene_output_to_bot_gene(gene)
 
 
-async def update_gene_field(db: AsyncSession, gene_id: str, field: str, value: str) -> BotGene | None:
+async def update_gene_field(
+    db: AsyncSession, gene_id: str, field: str, value: str
+) -> BotGene | None:
     """Update one editable gene field."""
     try:
         gene_uuid = _parse_uuid(gene_id)
@@ -815,7 +857,9 @@ async def toggle_prize_active(db: AsyncSession, prize_id: str) -> BotPrize | Non
     return _prize_to_bot(prize)
 
 
-async def update_prize_field(db: AsyncSession, prize_id: str, field: str, value: str) -> BotPrize | None:
+async def update_prize_field(
+    db: AsyncSession, prize_id: str, field: str, value: str
+) -> BotPrize | None:
     """Update one editable prize field."""
     prize_repository = PrizeRepositoryImpl(db)
     try:

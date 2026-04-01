@@ -35,14 +35,16 @@ class GeneRepositoryImpl(GeneRepository):
         return GeneMapper.model_to_domain(model) if model else None
 
     async def get_by_name(self, name: str) -> Optional[Gene]:
-        result = await self.session.execute(select(GeneModel).where(GeneModel.name == name.upper().strip()))
+        result = await self.session.execute(
+            select(GeneModel).where(GeneModel.name == name.upper().strip())
+        )
         model = result.scalars().first()
         return GeneMapper.model_to_domain(model) if model else None
 
     async def get_active_genes(self) -> list[Gene]:
         result = await self.session.execute(
             select(GeneModel)
-            .where(GeneModel.is_active == True)
+            .where(GeneModel.is_active.is_(True))
             .order_by(GeneModel.created_at.desc())
         )
         return [GeneMapper.model_to_domain(model) for model in result.scalars().all()]
@@ -56,7 +58,7 @@ class GeneRepositoryImpl(GeneRepository):
     async def get_random_active(self) -> Optional[Gene]:
         result = await self.session.execute(
             select(GeneModel)
-            .where(GeneModel.is_active == True)
+            .where(GeneModel.is_active.is_(True))
             .order_by(func.random())
             .limit(1)
         )

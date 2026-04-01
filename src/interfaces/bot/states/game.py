@@ -16,10 +16,11 @@ class AdminStates(StatesGroup):
 
     admin_menu = State()
     adding_gene = State()
-    editing_gene = State()    # редактирование поля гена
-    editing_prize = State()   # редактирование поля приза
+    editing_gene = State()  # редактирование поля гена
+    editing_prize = State()  # редактирование поля приза
     viewing_stats = State()
-    
+
+
 class ChatStates(StatesGroup):
     """Состояния чат-режима с ИИ."""
 

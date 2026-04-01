@@ -1,12 +1,13 @@
 """
 Webhook обработчик для Telegram бота
 """
+
+import hmac
+
 import structlog
 from aiogram import Bot, Dispatcher
 from aiogram.types import Update
 from fastapi import Request
-import hmac
-import hashlib
 
 logger = structlog.get_logger(__name__)
 
@@ -22,7 +23,7 @@ class WebhookHandler:
         try:
             # Логируем входящий запрос
             logger.info("🌐 Incoming webhook request")
-            
+
             # Проверка токена
             token = request.headers.get("X-Telegram-Bot-Api-Secret-Token")
             if not hmac.compare_digest(token or "", self.secret_token):
@@ -32,17 +33,17 @@ class WebhookHandler:
             # Получаем данные
             data = await request.json()
             logger.info("📦 Webhook data received", update_id=data.get("update_id"))
-            
+
             # Создаём Update объект
             update = Update(**data)
-            
+
             # Передаём в диспетчер
             logger.info("🔄 Feeding update to dispatcher", update_id=update.update_id)
             await self.dp.feed_update(bot=self.bot, update=update)
-            
+
             logger.info("✅ Update processed successfully", update_id=update.update_id)
             return {"status": "ok"}
-            
+
         except Exception as e:
             logger.error("❌ Error processing webhook", error=str(e), exc_info=True)
             return {"status": "error", "message": str(e)}
@@ -51,38 +52,38 @@ class WebhookHandler:
 async def setup_webhook(bot: Bot, webhook_url: str, secret_token: str = ""):
     """
     Настройка webhook в Telegram
-    
+
     Args:
         bot: Экземпляр бота
         webhook_url: URL для webhook (https://example.com/webhook/bot)
         secret_token: Секретный токен для валидации запросов
     """
     import asyncio
-    
+
     max_retries = 3
     for attempt in range(max_retries):
         try:
             # Удаляем старый webhook
             await bot.delete_webhook(drop_pending_updates=True)
             logger.info("Старый webhook удалён")
-            
+
             # Устанавливаем новый webhook
             success = await bot.set_webhook(
                 url=webhook_url,
                 secret_token=secret_token,
                 allowed_updates=["message", "callback_query"],
-                drop_pending_updates=False
+                drop_pending_updates=False,
             )
-            
+
             if not success:
                 raise RuntimeError("Failed to set webhook")
-            
+
             # Проверяем установку
             webhook_info = await bot.get_webhook_info()
             logger.info(f"✅ Webhook установлен: {webhook_info.url}")
             logger.info(f"Pending updates: {webhook_info.pending_update_count}")
             return True
-            
+
         except Exception as e:
             logger.error(
                 f"❌ Ошибка настройки webhook (попытка {attempt + 1}/{max_retries}): {str(e)}"

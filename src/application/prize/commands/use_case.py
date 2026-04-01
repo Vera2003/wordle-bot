@@ -7,9 +7,7 @@ from pydantic import BaseModel, ConfigDict, Field
 
 from src.application.prize.dto import PrizeOutput, UserPrizeOutput
 from src.domain.prize import (
-    EarnedPrizeRecord,
     Prize,
-    PrizeNotAvailableError,
     PrizeNotFoundError,
     PrizeRepository,
     PrizeService,

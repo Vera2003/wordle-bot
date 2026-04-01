@@ -1,17 +1,17 @@
 """Game use cases."""
 
-from .dto import (
-    GameStateOutput,
-    GameAttemptDTO,
-    SubmitGuessOutput,
-    GameResultOutput,
-    LetterStatus,
-)
 from .commands import (
     StartGameCommand,
     StartGameHandler,
     SubmitGuessCommand,
     SubmitGuessHandler,
+)
+from .dto import (
+    GameAttemptDTO,
+    GameResultOutput,
+    GameStateOutput,
+    LetterStatus,
+    SubmitGuessOutput,
 )
 
 __all__ = [
@@ -25,4 +25,3 @@ __all__ = [
     "SubmitGuessCommand",
     "SubmitGuessHandler",
 ]
-

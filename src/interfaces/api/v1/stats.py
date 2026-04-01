@@ -3,28 +3,30 @@
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from src.infrastructure.db.session import get_db_session
-from src.infrastructure.db.repositories.stats import StatsRepositoryImpl
+from src.application.stats.dto import GlobalStatsOutput, UserStatsOutput
 from src.application.stats.queries import (
     GetGlobalStatsHandler,
     GetGlobalStatsQuery,
     GetUserStatsHandler,
     GetUserStatsQuery,
 )
-from src.application.stats.dto import GlobalStatsOutput, UserStatsOutput
 from src.domain.stats.errors import UserNotFoundError
+from src.infrastructure.db.repositories.stats import StatsRepositoryImpl
+from src.infrastructure.db.session import get_db_session
 
 router = APIRouter(prefix="/stats", tags=["stats"])
 
 
-async def get_stats_repository(db: AsyncSession = Depends(get_db_session)) -> StatsRepositoryImpl:
+async def get_stats_repository(
+    db: AsyncSession = Depends(get_db_session),
+) -> StatsRepositoryImpl:
     """Dependency: Get stats repository."""
     return StatsRepositoryImpl(db)
 
 
 @router.get("/global")
 async def get_global_stats(
-    repository = Depends(get_stats_repository),
+    repository=Depends(get_stats_repository),
 ) -> GlobalStatsOutput:
     """Get global system statistics."""
     try:
@@ -38,7 +40,7 @@ async def get_global_stats(
 @router.get("/user/{telegram_id}")
 async def get_user_stats(
     telegram_id: int,
-    repository = Depends(get_stats_repository),
+    repository=Depends(get_stats_repository),
 ) -> UserStatsOutput:
     """Get statistics for a specific user."""
     try:

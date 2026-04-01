@@ -5,8 +5,7 @@ from uuid import UUID
 
 from pydantic import BaseModel, ConfigDict, Field
 
-from src.core.config import get_settings
-from src.domain.user import User, TelegramId, Username, UserRepository
+from src.domain.user import TelegramId, User, Username, UserRepository
 from src.domain.user.value_objects import Energy
 
 
@@ -16,9 +15,9 @@ def _username_value(username: Username | None) -> str | None:
 
 class GetOrCreateUserCommand(BaseModel):
     """Command to get existing user or create new one."""
-    
+
     model_config = ConfigDict(extra="forbid")
-    
+
     telegram_id: int = Field(..., gt=0)
     username: str | None = Field(None, max_length=32)
     full_name: str | None = Field(None, max_length=128)
@@ -26,9 +25,9 @@ class GetOrCreateUserCommand(BaseModel):
 
 class GetOrCreateUserOutput(BaseModel):
     """Output after get or create user."""
-    
+
     model_config = ConfigDict(from_attributes=True)
-    
+
     user_id: UUID
     telegram_id: int
     username: str | None
@@ -43,30 +42,34 @@ class GetOrCreateUserOutput(BaseModel):
 
 class GetOrCreateUserHandler:
     """Handler for GetOrCreateUser command."""
-    
-    def __init__(self, user_repository: UserRepository):
+
+    def __init__(self, user_repository: UserRepository, daily_energy: int):
         self.user_repository = user_repository
-    
+        self.daily_energy = daily_energy
+
     async def __call__(self, command: GetOrCreateUserCommand) -> GetOrCreateUserOutput:
         """Execute command."""
         from uuid import uuid4
-        
-        settings = get_settings()
+
         telegram_id = TelegramId(command.telegram_id)
-        
+
         # Try to get existing user
         existing_user = await self.user_repository.get_by_telegram_id(telegram_id)
-        
+
         if existing_user:
             # User exists - update profile if needed
             if command.username or command.full_name:
-                username = Username(command.username) if command.username else existing_user.username
+                username = (
+                    Username(command.username)
+                    if command.username
+                    else existing_user.username
+                )
                 existing_user.update_profile(
                     username=username,
                     full_name=command.full_name or existing_user.full_name,
                 )
                 await self.user_repository.save(existing_user)
-            
+
             return GetOrCreateUserOutput(
                 user_id=existing_user.id,
                 telegram_id=existing_user.telegram_id.value,
@@ -79,19 +82,19 @@ class GetOrCreateUserHandler:
                 updated_at=existing_user.updated_at,
                 is_new=False,
             )
-        
+
         # Create new user
         new_user = User(
             id=uuid4(),
             telegram_id=telegram_id,
             username=Username(command.username) if command.username else Username(None),
             full_name=command.full_name,
-            energy=Energy(settings.daily_energy, settings.daily_energy),
+            energy=Energy(self.daily_energy, self.daily_energy),
             last_energy_reset=datetime.now(timezone.utc).replace(tzinfo=None),
         )
-        
+
         await self.user_repository.save(new_user)
-        
+
         return GetOrCreateUserOutput(
             user_id=new_user.id,
             telegram_id=new_user.telegram_id.value,

@@ -2,15 +2,15 @@
 
 from .entities import Gene
 from .errors import (
+    GeneDifficultyError,
     GeneError,
+    GeneNotActiveError,
     GeneNotFoundError,
     InvalidGeneNameError,
-    GeneDifficultyError,
-    GeneNotActiveError,
 )
 from .repositories import GeneRepository
 from .services import GeneService
-from .value_objects import GeneName, GeneDifficulty
+from .value_objects import GeneDifficulty, GeneName
 
 __all__ = [
     # Entities

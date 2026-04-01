@@ -1,33 +1,29 @@
 """Mappers for converting ORM models to domain/application objects."""
 
-from datetime import datetime
-from typing import cast
-from uuid import UUID
-
-from src.core.config import get_settings
-from src.domain.user import User, TelegramId, Username, Energy
+from src.domain.user import Energy, TelegramId, User, Username
+from src.infrastructure.config.settings import get_settings
 from src.infrastructure.db.models.user import UserModel
 
 
 class UserMapper:
     """Mapper for User: ORM Model <-> Domain Entity."""
-    
+
     @staticmethod
     def model_to_domain(model: UserModel) -> User:
         """Convert SQLAlchemy UserModel to domain User entity."""
         settings = get_settings()
         return User(
-            id=cast(UUID, model.id),
-            telegram_id=TelegramId(cast(int, model.telegram_id)),
-            username=Username(cast(str | None, model.username)),
-            full_name=cast(str | None, model.full_name),
-            energy=Energy(cast(int, model.energy), settings.daily_energy),
-            total_points=cast(int, model.total_points),
-            last_energy_reset=cast(datetime | None, model.last_energy_reset),
-            created_at=cast(datetime | None, model.created_at),
-            updated_at=cast(datetime | None, model.updated_at),
+            id=model.id,
+            telegram_id=TelegramId(model.telegram_id),
+            username=Username(model.username),
+            full_name=model.full_name,
+            energy=Energy(model.energy, settings.daily_energy),
+            total_points=model.total_points,
+            last_energy_reset=model.last_energy_reset,
+            created_at=model.created_at,
+            updated_at=model.updated_at,
         )
-    
+
     @staticmethod
     def domain_to_model(user: User) -> UserModel:
         """Convert domain User entity to SQLAlchemy UserModel."""

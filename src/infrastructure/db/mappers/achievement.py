@@ -7,7 +7,10 @@ from src.domain.achievement import (
     RewardValue,
     UserAchievement,
 )
-from src.infrastructure.db.models.achievement import AchievementTypeModel, UserAchievementModel
+from src.infrastructure.db.models.achievement import (
+    AchievementTypeModel,
+    UserAchievementModel,
+)
 
 
 class AchievementTypeMapper:

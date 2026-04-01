@@ -9,14 +9,14 @@ from .stats import StatsRepositoryImpl
 from .user import UserRepositoryImpl
 
 __all__ = [
-	"UserRepositoryImpl",
-	"GameRepositoryImpl",
-	"SQLAlchemyGameRepository",
-	"StatsRepositoryImpl",
-	"GeneRepositoryImpl",
-	"PrizeRepositoryImpl",
-	"UserPrizeRepositoryImpl",
-	"AchievementTypeRepositoryImpl",
-	"UserAchievementRepositoryImpl",
-	"LLMLogRepositoryImpl",
+    "UserRepositoryImpl",
+    "GameRepositoryImpl",
+    "SQLAlchemyGameRepository",
+    "StatsRepositoryImpl",
+    "GeneRepositoryImpl",
+    "PrizeRepositoryImpl",
+    "UserPrizeRepositoryImpl",
+    "AchievementTypeRepositoryImpl",
+    "UserAchievementRepositoryImpl",
+    "LLMLogRepositoryImpl",
 ]

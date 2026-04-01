@@ -19,7 +19,9 @@ from src.domain.achievement import (
 )
 
 
-def _to_achievement_type_output(achievement_type: AchievementType) -> AchievementTypeOutput:
+def _to_achievement_type_output(
+    achievement_type: AchievementType,
+) -> AchievementTypeOutput:
     return AchievementTypeOutput(
         id=achievement_type.id,
         name=achievement_type.name,
@@ -32,7 +34,9 @@ def _to_achievement_type_output(achievement_type: AchievementType) -> Achievemen
     )
 
 
-def _to_user_achievement_output(user_achievement: UserAchievement) -> UserAchievementOutput:
+def _to_user_achievement_output(
+    user_achievement: UserAchievement,
+) -> UserAchievementOutput:
     return UserAchievementOutput(
         id=user_achievement.id,
         user_id=user_achievement.user_id,
@@ -55,8 +59,12 @@ class GetAchievementTypeByIdHandler:
     def __init__(self, achievement_type_repository: AchievementTypeRepository):
         self.achievement_type_repository = achievement_type_repository
 
-    async def __call__(self, query: GetAchievementTypeByIdQuery) -> AchievementTypeOutput:
-        achievement_type = await self.achievement_type_repository.get_by_id(query.achievement_type_id)
+    async def __call__(
+        self, query: GetAchievementTypeByIdQuery
+    ) -> AchievementTypeOutput:
+        achievement_type = await self.achievement_type_repository.get_by_id(
+            query.achievement_type_id
+        )
         if not achievement_type:
             raise AchievementTypeNotFoundError(
                 f"Achievement {query.achievement_type_id} not found"
@@ -76,7 +84,9 @@ class GetAllAchievementTypesHandler:
     def __init__(self, achievement_type_repository: AchievementTypeRepository):
         self.achievement_type_repository = achievement_type_repository
 
-    async def __call__(self, query: GetAllAchievementTypesQuery) -> list[AchievementTypeOutput]:
+    async def __call__(
+        self, query: GetAllAchievementTypesQuery
+    ) -> list[AchievementTypeOutput]:
         del query
         achievement_types = await self.achievement_type_repository.get_all()
         return [_to_achievement_type_output(item) for item in achievement_types]
@@ -96,8 +106,12 @@ class GetUserAchievementsHandler:
     def __init__(self, user_achievement_repository: UserAchievementRepository):
         self.user_achievement_repository = user_achievement_repository
 
-    async def __call__(self, query: GetUserAchievementsQuery) -> list[UserAchievementOutput]:
-        achievements = await self.user_achievement_repository.get_user_achievements(query.user_id)
+    async def __call__(
+        self, query: GetUserAchievementsQuery
+    ) -> list[UserAchievementOutput]:
+        achievements = await self.user_achievement_repository.get_user_achievements(
+            query.user_id
+        )
         return [_to_user_achievement_output(item) for item in achievements]
 
 
@@ -122,8 +136,12 @@ class GetAchievementProgressHandler:
         self.achievement_type_repository = achievement_type_repository
         self.user_achievement_repository = user_achievement_repository
 
-    async def __call__(self, query: GetAchievementProgressQuery) -> AchievementProgressOutput:
-        achievement_type = await self.achievement_type_repository.get_by_id(query.achievement_type_id)
+    async def __call__(
+        self, query: GetAchievementProgressQuery
+    ) -> AchievementProgressOutput:
+        achievement_type = await self.achievement_type_repository.get_by_id(
+            query.achievement_type_id
+        )
         if not achievement_type:
             raise AchievementTypeNotFoundError(
                 f"Achievement {query.achievement_type_id} not found"

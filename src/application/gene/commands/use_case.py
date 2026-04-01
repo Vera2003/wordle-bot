@@ -6,8 +6,13 @@ from uuid import UUID, uuid4
 from pydantic import BaseModel, ConfigDict, Field
 
 from src.application.gene.dto import GeneOutput
-from src.domain.gene import Gene, GeneDifficulty, GeneName, GeneNotFoundError, GeneRepository
-
+from src.domain.gene import (
+    Gene,
+    GeneDifficulty,
+    GeneName,
+    GeneNotFoundError,
+    GeneRepository,
+)
 
 DifficultyLevel = Literal["easy", "medium", "hard"]
 
@@ -125,13 +130,21 @@ class UpdateGeneHandler:
         if not gene:
             raise GeneNotFoundError(f"Gene {command.gene_id} not found")
 
-        if command.description is None and command.hint is None and command.difficulty is None:
+        if (
+            command.description is None
+            and command.hint is None
+            and command.difficulty is None
+        ):
             raise ValueError("At least one field must be provided for update")
 
         gene.update_details(
             description=command.description,
             hint=command.hint,
-            difficulty=GeneDifficulty(command.difficulty) if command.difficulty is not None else None,
+            difficulty=(
+                GeneDifficulty(command.difficulty)
+                if command.difficulty is not None
+                else None
+            ),
         )
         await self.gene_repository.save(gene)
         return _to_gene_output(gene)

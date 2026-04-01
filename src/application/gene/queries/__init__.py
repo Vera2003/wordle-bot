@@ -5,10 +5,10 @@ from .use_case import (
     GetActiveGenesQuery,
     GetGeneByIdHandler,
     GetGeneByIdQuery,
-    ListGenesHandler,
-    ListGenesQuery,
     GetRandomActiveGeneHandler,
     GetRandomActiveGeneQuery,
+    ListGenesHandler,
+    ListGenesQuery,
 )
 
 __all__ = [

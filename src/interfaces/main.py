@@ -8,10 +8,16 @@ from aiogram import Bot, Dispatcher
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 
-from src.core.config import get_settings
-from src.core.logging_config import setup_logging
+from src.infrastructure.config.settings import get_settings
 from src.infrastructure.db.engine import create_db_engine, create_session_maker
-from src.interfaces.api.v1 import gene_router, llm_router, prize_router, user_router, stats_router
+from src.infrastructure.telemetry.logging import setup_logging
+from src.interfaces.api.v1 import (
+    gene_router,
+    llm_router,
+    prize_router,
+    stats_router,
+    user_router,
+)
 from src.interfaces.bot.main import create_bot, create_dispatcher
 from src.interfaces.bot.webhook import WebhookHandler, remove_webhook, setup_webhook
 
@@ -76,7 +82,7 @@ async def lifespan(app: FastAPI):
 def create_app() -> FastAPI:
     """Create and configure FastAPI application."""
     settings = get_settings()
-    
+
     app = FastAPI(
         title="Wordle Bot API",
         description="Async API for Telegram Wordle bot",
@@ -85,16 +91,16 @@ def create_app() -> FastAPI:
         openapi_url="/api/openapi.json",
         lifespan=lifespan,
     )
-    
+
     # CORS middleware
     app.add_middleware(
         CORSMiddleware,
-        allow_origins=settings.CORS_ORIGINS or ["*"],
+        allow_origins=settings.cors_origins or ["*"],
         allow_credentials=True,
         allow_methods=["*"],
         allow_headers=["*"],
     )
-    
+
     # Include routers
     app.include_router(user_router, prefix="/api/v1")
     app.include_router(stats_router, prefix="/api/v1")
@@ -103,6 +109,7 @@ def create_app() -> FastAPI:
     app.include_router(llm_router, prefix="/api/v1")
 
     if settings.use_webhook:
+
         @app.post(settings.webhook_path)
         async def telegram_webhook(request: Request):
             """Receive Telegram webhook updates through the refactored bot interface layer."""
@@ -110,18 +117,18 @@ def create_app() -> FastAPI:
             if bot_runtime.webhook_handler is None:
                 return {"status": "webhook not initialized"}
             return await bot_runtime.webhook_handler.handle(request)
-    
+
     @app.get("/api/health")
     async def health_check():
         """Health check endpoint."""
         return {"status": "ok"}
-    
+
     return app
 
 
 if __name__ == "__main__":
     import uvicorn
-    
+
     app = create_app()
     uvicorn.run(
         app,

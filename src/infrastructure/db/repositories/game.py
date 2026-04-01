@@ -1,9 +1,10 @@
 """Game repository implementation."""
 
+from datetime import date
 from typing import Optional
 from uuid import UUID
 
-from sqlalchemy import select
+from sqlalchemy import delete, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
@@ -57,12 +58,58 @@ class GameRepositoryImpl(GameRepository):
             .options(selectinload(GameSessionModel.attempts_history))
             .where(
                 GameSessionModel.user_id == str(user_id),
-                GameSessionModel.is_finished == False,
+                GameSessionModel.is_finished.is_(False),
             )
             .order_by(GameSessionModel.created_at.desc())
         )
         model = result.scalars().first()
         return GameMapper.model_to_domain(model) if model else None
+
+    async def get_latest_finished_by_user_and_word(
+        self,
+        user_id: UUID,
+        word: str,
+    ) -> Optional[GameSession]:
+        """Get the latest finished game for a user and target word."""
+        result = await self.session.execute(
+            select(GameSessionModel)
+            .options(selectinload(GameSessionModel.attempts_history))
+            .where(
+                GameSessionModel.user_id == str(user_id),
+                GameSessionModel.word == word,
+                GameSessionModel.is_finished.is_(True),
+            )
+            .order_by(GameSessionModel.created_at.desc())
+            .limit(1)
+        )
+        model = result.scalars().first()
+        return GameMapper.model_to_domain(model) if model else None
+
+    async def has_finished_game_for_user_on_date(
+        self,
+        user_id: UUID,
+        word: str,
+        played_on: date,
+    ) -> bool:
+        """Check whether a user has already finished a game for the word on a day."""
+        result = await self.session.execute(
+            select(func.count())
+            .select_from(GameSessionModel)
+            .where(
+                GameSessionModel.user_id == str(user_id),
+                GameSessionModel.word == word,
+                GameSessionModel.is_finished.is_(True),
+                func.date(GameSessionModel.created_at) == played_on,
+            )
+        )
+        return bool(result.scalar_one())
+
+    async def delete_by_user(self, user_id: UUID) -> None:
+        """Delete all game sessions for a user."""
+        await self.session.execute(
+            delete(GameSessionModel).where(GameSessionModel.user_id == str(user_id))
+        )
+        await self.session.flush()
 
     async def delete(self, game_id: UUID) -> None:
         """Delete a game session."""

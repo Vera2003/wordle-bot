@@ -9,8 +9,15 @@ from uuid import UUID
 from openai import APIStatusError, APITimeoutError, AsyncOpenAI
 
 from src.application.llm import LLMCompletionOutput
-from src.core.config import Settings
-from src.domain.llm import LLMLogRepository, LLMModel, LLMRequestType, LLMResponse, LLMService, LLMPrompt
+from src.domain.llm import (
+    LLMLogRepository,
+    LLMModel,
+    LLMPrompt,
+    LLMRequestType,
+    LLMResponse,
+    LLMService,
+)
+from src.infrastructure.config.settings import Settings
 
 PROXYAPI_BASE_URL = "https://api.proxyapi.ru/openai/v1"
 

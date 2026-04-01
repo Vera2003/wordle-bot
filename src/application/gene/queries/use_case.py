@@ -3,11 +3,10 @@
 from typing import Literal, cast
 from uuid import UUID
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict
 
 from src.application.gene.dto import GeneOutput, GeneSummaryOutput
 from src.domain.gene import Gene, GeneNotFoundError, GeneRepository
-
 
 DifficultyLevel = Literal["easy", "medium", "hard"]
 

@@ -34,14 +34,16 @@ class PrizeRepositoryImpl(PrizeRepository):
         return PrizeMapper.model_to_domain(model) if model else None
 
     async def get_by_name(self, name: str) -> Optional[Prize]:
-        result = await self.session.execute(select(PrizeModel).where(PrizeModel.name == name.lower().strip()))
+        result = await self.session.execute(
+            select(PrizeModel).where(PrizeModel.name == name.lower().strip())
+        )
         model = result.scalars().first()
         return PrizeMapper.model_to_domain(model) if model else None
 
     async def get_active_prizes(self) -> list[Prize]:
         result = await self.session.execute(
             select(PrizeModel)
-            .where(PrizeModel.is_active == True)
+            .where(PrizeModel.is_active.is_(True))
             .order_by(PrizeModel.created_at.desc())
         )
         return [PrizeMapper.model_to_domain(model) for model in result.scalars().all()]
@@ -81,21 +83,39 @@ class UserPrizeRepositoryImpl(UserPrizeRepository):
         model = await self.session.get(UserPrizeModel, user_prize_id)
         return UserPrizeMapper.model_to_domain(model) if model else None
 
-    async def get_user_prizes(self, user_id: UUID, used_only: bool = False) -> list[UserPrize]:
+    async def get_user_prizes(
+        self, user_id: UUID, used_only: bool = False
+    ) -> list[UserPrize]:
         query = select(UserPrizeModel).where(UserPrizeModel.user_id == user_id)
         if used_only:
-            query = query.where(UserPrizeModel.is_used == True)
+            query = query.where(UserPrizeModel.is_used.is_(True))
         query = query.order_by(UserPrizeModel.awarded_at.desc())
         result = await self.session.execute(query)
-        return [UserPrizeMapper.model_to_domain(model) for model in result.scalars().all()]
+        return [
+            UserPrizeMapper.model_to_domain(model) for model in result.scalars().all()
+        ]
 
     async def get_unused_prizes(self, user_id: UUID) -> list[UserPrize]:
         result = await self.session.execute(
             select(UserPrizeModel)
-            .where(UserPrizeModel.user_id == user_id, UserPrizeModel.is_used == False)
+            .where(
+                UserPrizeModel.user_id == user_id,
+                UserPrizeModel.is_used.is_(False),
+            )
             .order_by(UserPrizeModel.awarded_at.desc())
         )
-        return [UserPrizeMapper.model_to_domain(model) for model in result.scalars().all()]
+        return [
+            UserPrizeMapper.model_to_domain(model) for model in result.scalars().all()
+        ]
+
+    async def delete_by_user(self, user_id: UUID) -> None:
+        """Delete all prize instances owned by a user."""
+        result = await self.session.execute(
+            select(UserPrizeModel).where(UserPrizeModel.user_id == user_id)
+        )
+        for model in result.scalars().all():
+            await self.session.delete(model)
+        await self.session.flush()
 
     async def delete(self, user_prize_id: UUID) -> None:
         model = await self.session.get(UserPrizeModel, user_prize_id)

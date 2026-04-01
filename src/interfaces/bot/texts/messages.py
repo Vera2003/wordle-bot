@@ -1,5 +1,16 @@
 """Текстовые константы бота"""
 
+from typing import Protocol, Sequence
+
+
+class AttemptLetterLike(Protocol):
+    @property
+    def letter(self) -> str: ...
+
+    @property
+    def status(self) -> str: ...
+
+
 # Список кнопок меню (для фильтрации в обработчиках)
 MENU_BUTTONS = [
     "🏠 Главное меню",
@@ -8,21 +19,21 @@ MENU_BUTTONS = [
     "📋 Правила игры",
     "💡 Подсказка дня",
     "⚡ Энергия",
-    "🎮 Играть"
+    "🎮 Играть",
 ]
 
 # Приветствие
 WELCOME_MESSAGE = """
 🧬 <b>Добро пожаловать в Генетический Wordle MyGenetics!</b>
 
-Это игра, где вы будете угадывать названия генов из вашего отчета MyExpert, 
+Это игра, где вы будете угадывать названия генов из вашего отчета MyExpert,
 как в популярной игре Wordle!
 
 <b>Как играть:</b>
 • У вас есть 6 попыток угадать название гена
 • После каждой попытки буквы окрасятся:
   🟨 <b>Желтый</b> - буква на правильном месте
-  ⬜ <b>Белый</b> - буква есть, но не на месте  
+    ⬜ <b>Белый</b> - буква есть, но не на месте
   ⬛ <b>Серый</b> - буквы нет в слове
 
 • Каждая попытка стоит 1⚡ энергии
@@ -201,15 +212,16 @@ ERROR_ALREADY_IN_GAME = """
 """
 
 
-def format_attempt_result(result: list) -> str:
+def format_attempt_result(result: Sequence[AttemptLetterLike]) -> str:
     emoji_map = {"correct": "🟨", "present": "⬜", "absent": "⬛"}
-    
+
     def get_symbol_width(char: str) -> int:
         import unicodedata
-        return 2 if unicodedata.east_asian_width(char) in ('F', 'W') else 1
-    
+
+        return 2 if unicodedata.east_asian_width(char) in ("F", "W") else 1
+
     SLOT_WIDTH = 3  # Всегда 3 колонки на слот
-    
+
     def pad_center(text: str, width: int) -> str:
         text_len = sum(get_symbol_width(c) for c in text)
         if text_len >= width:
@@ -217,28 +229,23 @@ def format_attempt_result(result: list) -> str:
         left = (width - text_len) // 2
         right = width - text_len - left
         return " " * left + text + " " * right
-    
+
     letters_row = " "
     colors_row = ""
-    
+
     for i, item in enumerate(result, start=1):
         ch = item.letter.upper()
         emoji = emoji_map[item.status]
-        
+
         # Базовый паддинг слота
         letter_slot = pad_center(ch, SLOT_WIDTH)
         color_slot = pad_center(emoji, SLOT_WIDTH)
-        
+
         # Пробелы: 1 для первой позиции, 2 для всех остальных
         # extra_spaces = " " * (1 if i == 1 else 2)
         extra_spaces = " " * 2
-        
+
         letters_row += letter_slot + extra_spaces
         colors_row += color_slot
-    
+
     return f"```\n{letters_row}\n{colors_row}\n```"
-
-
-
-
-

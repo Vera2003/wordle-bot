@@ -21,15 +21,17 @@ from src.application.gene import (
     GetRandomActiveGeneHandler,
     GetRandomActiveGeneQuery,
 )
-from src.core.security import require_admin_api_key
 from src.domain.gene import GeneNotFoundError
 from src.infrastructure.db.repositories.gene import GeneRepositoryImpl
 from src.infrastructure.db.session import get_db_session
+from src.interfaces.api.security import require_admin_api_key
 
 router = APIRouter(prefix="/genes", tags=["genes"])
 
 
-async def get_gene_repository(db: AsyncSession = Depends(get_db_session)) -> GeneRepositoryImpl:
+async def get_gene_repository(
+    db: AsyncSession = Depends(get_db_session),
+) -> GeneRepositoryImpl:
     """Dependency: get gene repository."""
     return GeneRepositoryImpl(db)
 
@@ -52,7 +54,9 @@ async def get_random_gene(
         handler = GetRandomActiveGeneHandler(repository)
         return await handler(GetRandomActiveGeneQuery())
     except GeneNotFoundError as error:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(error)) from error
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail=str(error)
+        ) from error
 
 
 @router.get("/{gene_id}")
@@ -65,12 +69,20 @@ async def get_gene(
         handler = GetGeneByIdHandler(repository)
         return await handler(GetGeneByIdQuery(gene_id=gene_id))
     except GeneNotFoundError as error:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Gene not found") from error
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="Gene not found"
+        ) from error
     except ValueError as error:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(error)) from error
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST, detail=str(error)
+        ) from error
 
 
-@router.post("/", status_code=status.HTTP_201_CREATED, dependencies=[Depends(require_admin_api_key)])
+@router.post(
+    "/",
+    status_code=status.HTTP_201_CREATED,
+    dependencies=[Depends(require_admin_api_key)],
+)
 async def create_gene(
     command: CreateGeneCommand,
     repository: GeneRepositoryImpl = Depends(get_gene_repository),
@@ -80,7 +92,9 @@ async def create_gene(
         handler = CreateGeneHandler(repository)
         return await handler(command)
     except ValueError as error:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(error)) from error
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST, detail=str(error)
+        ) from error
 
 
 @router.post("/{gene_id}/activate", dependencies=[Depends(require_admin_api_key)])
@@ -93,12 +107,20 @@ async def activate_gene(
         handler = ActivateGeneHandler(repository)
         return await handler(ActivateGeneCommand(gene_id=gene_id))
     except GeneNotFoundError as error:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Gene not found") from error
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="Gene not found"
+        ) from error
     except ValueError as error:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(error)) from error
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST, detail=str(error)
+        ) from error
 
 
-@router.delete("/{gene_id}", status_code=status.HTTP_204_NO_CONTENT, dependencies=[Depends(require_admin_api_key)])
+@router.delete(
+    "/{gene_id}",
+    status_code=status.HTTP_204_NO_CONTENT,
+    dependencies=[Depends(require_admin_api_key)],
+)
 async def deactivate_gene(
     gene_id: UUID,
     repository: GeneRepositoryImpl = Depends(get_gene_repository),
@@ -109,6 +131,10 @@ async def deactivate_gene(
         await handler(DeactivateGeneCommand(gene_id=gene_id))
         return Response(status_code=status.HTTP_204_NO_CONTENT)
     except GeneNotFoundError as error:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Gene not found") from error
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="Gene not found"
+        ) from error
     except ValueError as error:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(error)) from error
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST, detail=str(error)
+        ) from error

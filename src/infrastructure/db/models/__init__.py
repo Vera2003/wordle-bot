@@ -8,13 +8,13 @@ from .prize import PrizeModel, UserPrizeModel
 from .user import UserModel
 
 __all__ = [
-	"UserModel",
-	"GameSessionModel",
-	"GameAttemptModel",
-	"GeneModel",
-	"PrizeModel",
-	"UserPrizeModel",
-	"AchievementTypeModel",
-	"UserAchievementModel",
-	"LLMLogModel",
+    "UserModel",
+    "GameSessionModel",
+    "GameAttemptModel",
+    "GeneModel",
+    "PrizeModel",
+    "UserPrizeModel",
+    "AchievementTypeModel",
+    "UserAchievementModel",
+    "LLMLogModel",
 ]

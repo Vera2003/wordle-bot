@@ -6,7 +6,6 @@ from pydantic import BaseModel, ConfigDict, Field
 
 from src.application.achievement.dto import AchievementTypeOutput, UserAchievementOutput
 from src.domain.achievement import (
-    AchievementAlreadyUnlockedError,
     AchievementRequirement,
     AchievementService,
     AchievementType,
@@ -19,7 +18,9 @@ from src.domain.achievement import (
 )
 
 
-def _to_achievement_type_output(achievement_type: AchievementType) -> AchievementTypeOutput:
+def _to_achievement_type_output(
+    achievement_type: AchievementType,
+) -> AchievementTypeOutput:
     return AchievementTypeOutput(
         id=achievement_type.id,
         name=achievement_type.name,
@@ -32,7 +33,9 @@ def _to_achievement_type_output(achievement_type: AchievementType) -> Achievemen
     )
 
 
-def _to_user_achievement_output(user_achievement: UserAchievement) -> UserAchievementOutput:
+def _to_user_achievement_output(
+    user_achievement: UserAchievement,
+) -> UserAchievementOutput:
     return UserAchievementOutput(
         id=user_achievement.id,
         user_id=user_achievement.user_id,
@@ -60,7 +63,9 @@ class CreateAchievementTypeHandler:
     def __init__(self, achievement_type_repository: AchievementTypeRepository):
         self.achievement_type_repository = achievement_type_repository
 
-    async def __call__(self, command: CreateAchievementTypeCommand) -> AchievementTypeOutput:
+    async def __call__(
+        self, command: CreateAchievementTypeCommand
+    ) -> AchievementTypeOutput:
         achievement_type = AchievementType(
             id=uuid4(),
             name=command.name,
@@ -95,8 +100,12 @@ class UnlockAchievementHandler:
         self.achievement_type_repository = achievement_type_repository
         self.user_achievement_repository = user_achievement_repository
 
-    async def __call__(self, command: UnlockAchievementCommand) -> UserAchievementOutput:
-        achievement_type = await self.achievement_type_repository.get_by_id(command.achievement_type_id)
+    async def __call__(
+        self, command: UnlockAchievementCommand
+    ) -> UserAchievementOutput:
+        achievement_type = await self.achievement_type_repository.get_by_id(
+            command.achievement_type_id
+        )
         if not achievement_type:
             raise AchievementTypeNotFoundError(
                 f"Achievement {command.achievement_type_id} not found"

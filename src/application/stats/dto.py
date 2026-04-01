@@ -1,16 +1,15 @@
 """Stats application layer data transfer objects."""
 
-from pydantic import BaseModel, Field, ConfigDict
 from typing import Optional
-from uuid import UUID
-from datetime import datetime
+
+from pydantic import BaseModel, ConfigDict, Field
 
 
 class TopPlayerOutput(BaseModel):
     """Top player in rankings."""
-    
+
     model_config = ConfigDict(from_attributes=True)
-    
+
     telegram_id: int = Field(..., gt=0)
     name: str
     points: int = Field(..., ge=0)
@@ -18,9 +17,9 @@ class TopPlayerOutput(BaseModel):
 
 class GameStatsOutput(BaseModel):
     """Game statistics output."""
-    
+
     model_config = ConfigDict(from_attributes=True)
-    
+
     total_games: int = Field(..., ge=0)
     won_games: int = Field(..., ge=0)
     lost_games: int = Field(..., ge=0)
@@ -29,9 +28,9 @@ class GameStatsOutput(BaseModel):
 
 class GlobalStatsOutput(BaseModel):
     """Global statistics for the entire system."""
-    
+
     model_config = ConfigDict(from_attributes=True)
-    
+
     total_users: int = Field(..., ge=0)
     total_games: int = Field(..., ge=0)
     won_games: int = Field(..., ge=0)
@@ -44,9 +43,9 @@ class GlobalStatsOutput(BaseModel):
 
 class UserStatsOutput(BaseModel):
     """Statistics for a specific user."""
-    
+
     model_config = ConfigDict(from_attributes=True)
-    
+
     telegram_id: int = Field(..., gt=0)
     username: Optional[str] = None
     full_name: Optional[str] = None
